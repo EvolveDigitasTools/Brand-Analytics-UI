@@ -66,3 +66,5 @@ npm run test:e2e
 ```sh
 npm run lint
 ```
+Run: docker run -p 5173:5173 -v "%cd%:/app" -v /app/node_modules analytics-app-dev
+Build: docker build -f Dockerfile.dev -t analytics-app-dev .

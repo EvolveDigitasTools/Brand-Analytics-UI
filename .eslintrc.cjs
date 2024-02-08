@@ -23,4 +23,5 @@ module.exports = {
   parserOptions: {
     ecmaVersion: 'latest'
   }
+  //TODO: Parser Options: Ensure parserOptions is set correctly to parse TypeScript code. You might want to specify parser: '@typescript-eslint/parser' explicitly if you face any issues with TypeScript linting.
 }

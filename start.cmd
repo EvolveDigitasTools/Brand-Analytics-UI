@@ -1,1 +1,1 @@
-npm run dev
+docker run -p 5173:5173 -v "%cd%:/app" -v /app/node_modules analytics-app-dev
