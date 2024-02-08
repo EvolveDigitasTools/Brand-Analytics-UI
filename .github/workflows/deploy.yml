@@ -27,9 +27,9 @@ jobs:
     # Add additional steps for any tests or other checks you want to run
 
     - name: FTP Deploy
-    uses: SamKirkland/FTP-Deploy-Action@4.1.0
-    with:
-      ftp-server: ftp://cruxdevelopment.com/public_html/brand-analytics
-      ftp-username: ${{ secrets.FTP_USERNAME }}
-      ftp-password: ${{ secrets.FTP_PASSWORD }}
-      local-dir: dist/
+      uses: SamKirkland/FTP-Deploy-Action@4.1.0
+      with:
+        ftp-server: ftp://cruxdevelopment.com/public_html/brand-analytics
+        ftp-username: ${{ secrets.FTP_USERNAME }}
+        ftp-password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: dist/
