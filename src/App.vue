@@ -1,10 +1,7 @@
-<script setup lang="ts">
-import { RouterView } from 'vue-router'
-</script>
-
 <template>
-  <RouterView />
+  <v-app>
+    <v-layout class="bg-background-light dark:bg-background-dark h-full w-full">
+      <router-view />
+    </v-layout>
+  </v-app>
 </template>
-
-<style scoped>
-</style>
