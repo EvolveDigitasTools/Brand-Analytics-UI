@@ -9,10 +9,12 @@ export default {
         'brand-teal': '#75bfb0',
         'brand-teal-alt': '#42a9a8',
         'brand-highlight': '#f1b84c',
+        'yellow-test': '#f1b84c',
+        'white-shade': '#fafafa',
 
         // Consider these if you want a more traditional light/dark approach:
         background: {
-          light: '#fafafa',
+          light: '#a0d4c6',
           dark: '#141b21',
         },
         text: {
