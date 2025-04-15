@@ -73,7 +73,7 @@ export default {
       this.loading = true
       this.error = false
       try {
-        const response = await axios.get('http://localhost:8080/api/inventory/overview')
+        const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/inventory/overview`)
         this.data = response.data
         this.colors = this.generateColors(this.filteredVendors.length)
         this.$nextTick(() => {

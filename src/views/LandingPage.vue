@@ -14,7 +14,7 @@ import LandingNavbar from '../components/landingNavbar/LandingNavbar.vue';
                     Drive Growth</h1>
                 <h3 class="text-base sm:text-lg text-white mb-6">Actionable intelligence to fuel your brand's success.
                 </h3>
-                <RouterLink to="/dashboard/inventory"
+                <RouterLink to="/dashboard"
                     class="bg-white text-brand-teal py-2 px-6 rounded-full shadow-md hover:bg-opacity-75 transition duration-300 text-center">
                     View Dashboard
                 </RouterLink>
