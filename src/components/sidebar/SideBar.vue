@@ -24,7 +24,9 @@ import { ref } from 'vue'
 const menuItems = ref([
     { title: 'Overview', route: '/dashboard/overview', icon: 'mdi-view-dashboard' },
     { title: 'Inventory', route: '/dashboard/inventory', icon: 'mdi-package' },
-    { title: 'Meesho Inventory', route: '/dashboard/meesho-inventory', avatar: '/assets/logo/meesho_logo.png' },
-    { title: 'Update Inventory', route: '/dashboard/update-inventory', icon: 'mdi-package-up' }
+    // { title: 'Meesho Inventory', route: '/dashboard/meesho-inventory', avatar: '/assets/logo/meesho_logo.png' },
+    // { title: 'Marketplace Orders', route: '/dashboard/marketplace-orders', icon: 'mdi-shopping' },
+    { title: 'Update Orders', route: '/dashboard/update-orders', icon: 'mdi-package-up' },
+    { title: 'SKU Mapping', route: '/dashboard/sku-mapping', icon: 'mdi-package-variant' },
 ])
 </script>

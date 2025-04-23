@@ -4,6 +4,15 @@
         <header class="inventory-header">
             <h1>Inventory Management</h1>
             <div class="header-controls">
+                <div>
+                    <div>
+                        <v-autocomplete label="Select Vendor"
+                            :items="['All', ...vendors.map(vendor => vendor.brandName)]" v-model="selectedVendor"
+                            @update:modelValue="onVendorChange"
+                            style="min-width: 200px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                            class="custom-autocomplete"></v-autocomplete>
+                    </div>
+                </div>
                 <input type="text" v-model="searchQuery" placeholder="Search by SKU or Product Name"
                     class="search-input" />
                 <button @click="showUpdateModal = true" class="btn-primary">
@@ -25,7 +34,7 @@
             <table>
                 <thead>
                     <tr>
-                        <th v-for="column in columns.filter(column => column.visible == true)" :key="column.key">
+                        <th v-for="column in columns" :key="column.key">
                             <div class="column-header">
                                 <span>{{ column.label }}</span>
                                 <div class="filter-controls">
@@ -41,7 +50,6 @@
                 <tbody>
                     <tr v-for="row in filteredRows" :key="row.skuCode">
                         <td>{{ row.skuCode }}</td>
-                        <td>{{ row.category }}</td>
                         <td>{{ row.productTitle }}</td>
                         <td>{{ row.currentInventory }}</td>
                         <td>{{ row.expiryDate }}</td>
@@ -55,6 +63,10 @@
             <div class="modal-content">
                 <h2>Stock Update</h2>
                 <div class="modal-options">
+                    <label class="modal-btn">
+                        Date of Inventory Update:
+                        <input type="date" v-model="inventoryUpdateDate" class="date-input" />
+                    </label>
                     <button @click="downloadExcel" class="modal-btn download-btn">
                         Download Stock Sheet
                     </button>
@@ -81,21 +93,18 @@ export default {
             activeTab: 'All Inventory',
             tabs: ['All Inventory', 'Low Inventory', 'Out of Stock'],
             columns: [
-                { key: 'skuCode', label: 'SKU Code*', visible: true },
-                { key: 'category', label: 'Category*', visible: true },
-                { key: 'productTitle', label: 'Product Title*', visible: true },
-                { key: 'sapCode', label: 'SAP Code' },
-                { key: 'hsn', label: 'HSN' },
-                { key: 'ean', label: 'EAN' },
-                { key: 'modelNumber', label: 'Model Number' },
-                { key: 'currentInventory', label: 'Current Inventory', visible: true },
-                { key: 'updatedInventory', label: 'Updated Inventory' },
-                { key: 'expiryDate', label: 'Expiry Date', visible: true },
+                { key: 'skuCode', label: 'SKU Code*' },
+                { key: 'productTitle', label: 'Product Title*' },
+                { key: 'currentInventory', label: 'Current Inventory' },
+                { key: 'expiryDate', label: 'Expiry Date' },
             ],
             filters: {},
             sortConfig: { key: null, asc: true },
             showUpdateModal: false,
-            uploadLoading: false
+            uploadLoading: false,
+            vendors: [],
+            selectedVendor: 'All',
+            inventoryUpdateDate: new Date().toISOString().substr(0, 10),
         };
     },
     computed: {
@@ -115,7 +124,19 @@ export default {
                 );
 
                 return matchesSearch && matchesTab && matchesFilters;
+            }).map(row => {
+                return {
+                    ...row,
+                    currentInventory:
+                        (row.currentInventory1 ?? 0) +
+                        (row.currentInventory2 ?? 0) +
+                        (row.currentInventory3 ?? 0) +
+                        (row.currentInventory4 ?? 0),
+                    expiryDate: row.expiryDate1 ? `${row.expiryDate1}(${row.currentInventory1})` : ''
+                };
             });
+
+            console.log(filtered, 'filtered');
 
             if (this.sortConfig.key) {
                 filtered = filtered.sort((a, b) => {
@@ -133,33 +154,26 @@ export default {
             this.inventoryData.forEach(item => {
                 if (item["Current Inventory"] && item["Current Inventory"].length) {
                     // For each inventory record, create a row.
-                    item["Current Inventory"].forEach(inv => {
-                        rows.push({
-                            skuCode: item["SKU Code"],
-                            category: item["Category"],
-                            productTitle: item["Product Title"],
-                            sapCode: item["SAP Code"],
-                            hsn: item["HSN"],
-                            ean: item["EAN"],
-                            modelNumber: item["Model Number"],
-                            currentInventory: inv.count,
-                            updatedInventory: '', // For user input
-                            expiryDate: inv.expiry ?? ''
-                        });
+                    const row = {
+                        skuCode: item["SKU Code"],
+                        productTitle: item["Product Title"],
+                        sapCode: item["SAP Code"],
+                        ean: item["EAN"],
+                    };
+                    item["Current Inventory"].forEach((inv, i) => {
+                        row[`currentInventory${i + 1}`] = inv.count;
+                        row[`updatedInventory${i + 1}`] = '';
+                        row[`expiryDate${i + 1}`] = inv.expiry ?? '';
                     });
+                    rows.push(row);
                 } else {
                     // For SKUs with no inventory, add one row with 0 and a blank row below.
                     rows.push({
                         skuCode: item["SKU Code"],
-                        category: item["Category"],
                         productTitle: item["Product Title"],
                         sapCode: item["SAP Code"],
-                        hsn: item["HSN"],
                         ean: item["EAN"],
-                        modelNumber: item["Model Number"],
-                        currentInventory: 0,
-                        updatedInventory: '',
-                        expiryDate: ''
+                        currentInventory1: 0
                     });
                 }
             });
@@ -192,43 +206,49 @@ export default {
 
                         // Map column headers
                         const headerRow = worksheet.getRow(1);
-                        let skuCodeCol, updatedInvCol, expiryDateCol;
+                        let skuCodeCol, currentInvCols = [], updatedInvCols = [], expiryDateCols = [];
 
                         headerRow.eachCell((cell, colNumber) => {
-                            switch (cell.value.trim()) {
-                                case 'SKU Code*': skuCodeCol = colNumber; break;
-                                case 'Updated Inventory': updatedInvCol = colNumber; break;
-                                case 'Expiry Date': expiryDateCol = colNumber; break;
-                            }
+                            const header = cell.value.trim();
+                            if (header === 'SKU Code*') skuCodeCol = colNumber;
+                            if (header.startsWith('Current Inventory')) currentInvCols.push(colNumber);
+                            if (header.startsWith('Updated Inventory')) updatedInvCols.push(colNumber);
+                            if (header.startsWith('Expiry Date')) expiryDateCols.push(colNumber);
                         });
 
-                        if (!skuCodeCol || !updatedInvCol) {
+                        if (!skuCodeCol || updatedInvCols.length === 0) {
                             throw new Error('Missing required columns in Excel file');
                         }
 
-                        let skuCode
                         // Process rows
                         worksheet.eachRow((row, rowNumber) => {
                             if (rowNumber === 1) return; // Skip header
 
-                            skuCode = row.getCell(skuCodeCol).text.trim().length > 0 ? row.getCell(skuCodeCol).text.trim() : skuCode;
-                            const updatedInv = parseFloat(row.getCell(updatedInvCol).text);
+                            const skuCode = row.getCell(skuCodeCol).text.trim();
+                            if (!skuCode) return;
 
-                            if (!skuCode || isNaN(updatedInv)) return;
+                            updatedInvCols.forEach((updatedCol, index) => {
+                                const currentInv = parseFloat(row.getCell(currentInvCols[index]).value) || 0;
+                                const updatedInvCell = row.getCell(updatedCol);
+                                const updatedInv = updatedInvCell?.value !== undefined && updatedInvCell?.value !== null ? parseFloat(updatedInvCell.value)
+                                    : null;
 
-                            const expiryCell = expiryDateCol ? row.getCell(expiryDateCol) : null;
-                            let expiryDate = '';
+                                if (updatedInv === null || isNaN(updatedInv)) return;
 
-                            if (expiryCell) {
-                                expiryDate = expiryCell.type === ValueType.Date ?
-                                    expiryCell.value.toISOString() :
-                                    expiryCell.text;
-                            }
+                                if (updatedInv !== currentInv) {
+                                    const expiryDateCell = row.getCell(expiryDateCols[index]);
+                                    const expiryDate = expiryDateCell?.value
+                                        ? expiryDateCell.type === ValueType.Date
+                                            ? expiryDateCell.value.toISOString().split('T')[0]
+                                            : expiryDateCell.text
+                                        : null;
 
-                            updates.push({
-                                skuCode,
-                                updatedInventory: updatedInv,
-                                expiryDate: expiryDate || null
+                                    updates.push({
+                                        skuCode,
+                                        updatedInventory: updatedInv,
+                                        expiryDate: expiryDate || null,
+                                    });
+                                }
                             });
                         });
 
@@ -237,7 +257,17 @@ export default {
                             throw new Error('No valid inventory updates found in file');
                         }
 
-                        await axios.post('http://localhost:8080/api/inventory/update', { updates });
+                        // Send data to backend
+                        const payload = {
+                            updates,
+                            updateTimestamp: (() => {
+                                const date = new Date(this.inventoryUpdateDate);
+                                date.setHours(17, 0, 0, 0); // Set time to 5:00 PM (17:00:00)
+                                return date.toISOString();
+                            })(),
+                        };
+
+                        await axios.post(`${import.meta.env.VITE_BACKEND_URL}/inventory/update`, payload);
                         this.uploadLoading = false;
                         await this.fetchInventoryData();
                         this.showUpdateModal = false;
@@ -255,8 +285,10 @@ export default {
         },
         // Keep existing methods (fetchInventoryData, downloadExcel)
         async fetchInventoryData() {
+            const vendorCode = this.$route.params.vendorCode;
+
             try {
-                const response = await axios.get('http://localhost:8080/api/inventory/');
+                const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/inventory/${vendorCode}`);
                 if (response.data && response.data.success) {
                     // Assuming the API response returns inventory data in data.inventory
                     this.inventoryData = response.data.data.inventory;
@@ -264,6 +296,32 @@ export default {
             } catch (error) {
                 console.error('Error fetching inventory:', error);
             }
+        },
+        async fetchVendors() {
+            try {
+                const vendorCode = this.$route.params.vendorCode;
+                const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/vendor/all`);
+                if (response.data) {
+                    // Assuming the API response returns vendor data in data.vendors
+                    this.vendors = response.data;
+                    this.selectedVendor = this.vendors.find(vendor => vendor.vendorCode === vendorCode)?.brandName || 'All';
+                }
+            } catch (error) {
+                console.error('Error fetching vendors:', error);
+            }
+        },
+        onVendorChange(selectedBrandName) {
+            const selectedVendor = this.vendors.find(vendor => vendor.brandName === selectedBrandName);
+            const vendorCode = selectedVendor ? selectedVendor.vendorCode : null;
+
+            // Update the URL with the selected vendorCode
+            this.$router.push({
+                name: this.$route.name,
+                params: { vendorCode: vendorCode || '' },
+            }).then(() => {
+                // Fetch inventory data after the route has been updated
+                this.fetchInventoryData();
+            });
         },
         async downloadExcel() {
             // Create a new workbook and worksheet using exceljs.
@@ -273,17 +331,34 @@ export default {
             // Define the headers.
             const headers = [
                 { header: 'SKU Code*', key: 'skuCode', width: 15 },
-                { header: 'Category*', key: 'category', width: 15 },
-                { header: 'Product Title*', key: 'productTitle', width: 20 },
+                { header: 'Product Title*', key: 'productTitle', width: 30 },
                 { header: 'SAP Code', key: 'sapCode', width: 15 },
-                { header: 'HSN', key: 'hsn', width: 15 },
                 { header: 'EAN', key: 'ean', width: 15 },
-                { header: 'Model Number', key: 'modelNumber', width: 15 },
-                { header: 'Current Inventory', key: 'currentInventory', width: 18 },
-                { header: 'Updated Inventory', key: 'updatedInventory', width: 18 },
-                { header: 'Expiry Date', key: 'expiryDate', width: 15 }
+                { header: 'Current Inventory 1', key: 'currentInventory1', width: 18 },
+                { header: 'Updated Inventory 1', key: 'updatedInventory1', width: 18 },
+                { header: 'Expiry Date 1 (yyyy-mm-dd)', key: 'expiryDate1', width: 15 },
+                { header: 'Current Inventory 2', key: 'currentInventory2', width: 18 },
+                { header: 'Updated Inventory 2', key: 'updatedInventory2', width: 18 },
+                { header: 'Expiry Date 2 (yyyy-mm-dd)', key: 'expiryDate2', width: 15 },
+                { header: 'Current Inventory 3', key: 'currentInventory3', width: 18 },
+                { header: 'Updated Inventory 3', key: 'updatedInventory3', width: 18 },
+                { header: 'Expiry Date 3 (yyyy-mm-dd)', key: 'expiryDate3', width: 15 },
+                { header: 'Current Inventory 4', key: 'currentInventory4', width: 18 },
+                { header: 'Updated Inventory 4', key: 'updatedInventory4', width: 18 },
+                { header: 'Expiry Date 4 (yyyy-mm-dd)', key: 'expiryDate4', width: 15 }
             ];
             worksheet.columns = headers;
+
+            // Freeze the first row and first column
+            worksheet.views = [
+                { state: 'frozen', xSplit: 1, ySplit: 1 } // Freeze first row and first column
+            ];
+
+            const headerRow = worksheet.getRow(1);
+            headerRow.height = 35; // Set height for the header row
+            headerRow.eachCell((cell) => {
+                cell.alignment = { wrapText: true, vertical: 'middle', horizontal: 'center' }; // Enable text wrapping
+            });
 
             // Add rows to the worksheet.
             this.excelRows.forEach(row => {
@@ -310,6 +385,7 @@ export default {
     },
     mounted() {
         this.fetchInventoryData();
+        this.fetchVendors();
     }
 };
 </script>
@@ -465,5 +541,30 @@ th {
     border: none;
     font-size: 24px;
     cursor: pointer;
+}
+
+.custom-autocomplete {
+    margin: 0;
+    /* Remove extra space */
+    padding: 0;
+    /* Remove extra space */
+    display: inline-block;
+    /* Ensure it only takes up the necessary space */
+}
+
+.custom-autocomplete .v-input {
+    white-space: nowrap;
+    /* Prevent text wrapping */
+    overflow: hidden;
+    /* Hide overflowing text */
+    text-overflow: ellipsis;
+    /* Add ellipsis for long text */
+}
+
+.custom-autocomplete .v-input__control {
+    min-width: 200px;
+    /* Set a minimum width */
+    max-width: 100%;
+    /* Allow it to grow as needed */
 }
 </style>

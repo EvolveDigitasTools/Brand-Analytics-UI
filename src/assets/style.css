@@ -5,3 +5,8 @@
 html {
     overflow: auto !important;
 }
+
+
+.v-input__details {
+    display: none !important; /* Hide the details section */
+}
