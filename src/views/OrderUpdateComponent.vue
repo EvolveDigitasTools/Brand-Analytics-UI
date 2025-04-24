@@ -36,8 +36,7 @@
         </v-row>
         <v-row>
           <v-col class="d-flex justify-center">
-            <v-btn color="primary" @click="updateOrders" :loading="isLoading"
-              :disabled="orders.length === 0">
+            <v-btn color="primary" @click="updateOrders" :loading="isLoading" :disabled="orders.length === 0">
               Update Orders
             </v-btn>
           </v-col>
@@ -57,13 +56,13 @@
         <v-data-table :headers="orderHeaders" :items="orders" :search="search" :items-per-page="10" :footer-props="{
           'items-per-page-options': [10, 20, 50, 100],
         }" class="elevation-1">
-          <template v-slot:item.orderDate="{ item }">
+          <template #item.orderDate="{ item }">
             {{ formatDate(item.orderDate) }}
           </template>
-          <template v-slot:item.orderValue="{ item }">
+          <template #item.orderValue="{ item }">
             {{ formatCurrency(item.orderValue) }}
           </template>
-          <template v-slot:item.orderItems="{ item }">
+          <template #item.orderItems="{ item }">
             <div v-if="item.orderItems && item.orderItems.length > 0">
               <v-chip small class="mr-1 mb-1" v-for="(orderItem, index) in item.orderItems" :key="index">
                 {{ orderItem.skuCode }} ({{ orderItem.quantity }})
@@ -73,7 +72,7 @@
               -
             </div>
           </template>
-          <template v-slot:item.address="{ item }">
+          <template #item.address="{ item }">
             <div v-if="item.address">
               {{ formatAddress(item.address) }}
             </div>
@@ -98,8 +97,8 @@ import Papa from 'papaparse';
 // State
 const orders = ref<Order[]>([])
 const isLoading = ref(false)
-const meeshoFile = ref<File | null>(null);
-const otherMarketplaceFile = ref<File | null>(null);
+const meeshoFile = ref<File | File[]>();
+const otherMarketplaceFile = ref<File | File[]>();
 const search = ref('')
 
 const downloadOtherOrdersExcel = async () => {
@@ -198,8 +197,7 @@ const handleMeeshoFileChange = async (e: any) => {
 
         sheet.eachRow((row, i) => {
           if (i > 1) {
-            const cols = row.values.slice(1) as ExcelJS.Cell[];
-            console.log(cols, 'cols');
+            const cols = (row.values && Array.isArray(row.values)) ? row.values.slice(1) as ExcelJS.Cell[] : [];
             orders.value.push(parseMeeshoRowToOrder(cols));
           }
         });
@@ -324,12 +322,12 @@ const updateOrders = async () => {
       })),
       address: order.address
         ? {
-            addressLine1: order.address.addressLine1 || undefined,
-            addressLine2: order.address.addressLine2 || undefined,
-            city: order.address.city || undefined,
-            state: order.address.state || undefined,
-            postalCode: order.address.postalCode || undefined,
-          }
+          addressLine1: order.address.addressLine1 || undefined,
+          addressLine2: order.address.addressLine2 || undefined,
+          city: order.address.city || undefined,
+          state: order.address.state || undefined,
+          postalCode: order.address.postalCode || undefined,
+        }
         : undefined,
     }));
 

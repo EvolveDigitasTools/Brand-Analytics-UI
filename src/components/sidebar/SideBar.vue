@@ -8,9 +8,9 @@
             <v-list-item v-for="(item, index) in menuItems" :key="index" link :to="item.route">
                 <template #prepend>
                     <v-icon v-if="item.icon">{{ item.icon }}</v-icon>
-                    <v-avatar v-else-if="item.avatar" size="24" class="mr-4">
+                    <!-- <v-avatar v-else-if="item.avatar" size="24" class="mr-4">
                         <v-img :src="item.avatar" />
-                    </v-avatar>
+                    </v-avatar> -->
                 </template>
                 <v-list-item-title>{{ item.title }}</v-list-item-title>
             </v-list-item>
