@@ -28,9 +28,21 @@ export interface OrderAddress {
   postalCode?: number;
 }
 
+export enum OrderStatus {
+  SHIPPED = 'SHIPPED',
+  CANCELLED = 'CANCELLED',
+  DELIVERED = 'DELIVERED',
+  RETURNED = 'RETURNED',
+  RETURNED_GOOD = 'RETURNED_GOOD',
+  RETURNED_BAD = 'RETURNED_BAD',
+  COMPLETED = 'COMPLETED',
+  DOOR_STEP_EXCHANGED = 'DOOR_STEP_EXCHANGED',
+  DOOR_STEP_EXCHANGEFAILED = 'DOOR_STEP_EXCHANGEFAILED',
+}
+
 export interface Order {
   orderId: string;
-  orderStatus: string;
+  orderStatus: OrderStatus;
   orderDate: string;
   orderValue: number;
   marketplace: string;

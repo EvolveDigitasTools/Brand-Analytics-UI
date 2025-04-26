@@ -91,7 +91,7 @@ export default {
             inventoryData: [],
             searchQuery: '',
             activeTab: 'All Inventory',
-            tabs: ['All Inventory', 'Low Inventory', 'Out of Stock'],
+            tabs: ['All Inventory', 'Low Inventory', 'Out of Stock', 'Near Expiry Inventory', 'Expired Inventory'],
             columns: [
                 { key: 'skuCode', label: 'SKU Code*' },
                 { key: 'productTitle', label: 'Product Title*' },
@@ -115,9 +115,16 @@ export default {
                     row.productTitle.toLowerCase().includes(term)
                 );
 
+                const totalInventory = (row.currentInventory1 ?? 0) +
+                        (row.currentInventory2 ?? 0) +
+                        (row.currentInventory3 ?? 0) +
+                        (row.currentInventory4 ?? 0) +
+                        (row.currentInventory5 ?? 0)
                 const matchesTab = this.activeTab === 'All Inventory' ||
-                    (this.activeTab === 'Low Inventory' && row.currentInventory < 10) ||
-                    (this.activeTab === 'Out of Stock' && row.currentInventory === 0);
+                    (this.activeTab === 'Low Inventory' && totalInventory < 50 && totalInventory > 0) ||
+                    (this.activeTab === 'Out of Stock' && totalInventory === 0) ||
+                    (this.activeTab === 'Near Expiry Inventory' && row.expiryDate1 && new Date(row.expiryDate1) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && new Date(row.expiryDate1) > new Date()) ||
+                    (this.activeTab === 'Expired Inventory' && row.expiryDate1 && new Date(row.expiryDate1) < new Date());
 
                 const matchesFilters = Object.entries(this.filters).every(([key, value]) =>
                     !value || String(row[key]).toLowerCase().includes(value.toLowerCase())
@@ -131,12 +138,11 @@ export default {
                         (row.currentInventory1 ?? 0) +
                         (row.currentInventory2 ?? 0) +
                         (row.currentInventory3 ?? 0) +
-                        (row.currentInventory4 ?? 0),
+                        (row.currentInventory4 ?? 0) +
+                        (row.currentInventory5 ?? 0),
                     expiryDate: row.expiryDate1 ? `${row.expiryDate1}(${row.currentInventory1})` : ''
                 };
             });
-
-            console.log(filtered, 'filtered');
 
             if (this.sortConfig.key) {
                 filtered = filtered.sort((a, b) => {
@@ -345,7 +351,10 @@ export default {
                 { header: 'Expiry Date 3 (yyyy-mm-dd)', key: 'expiryDate3', width: 15 },
                 { header: 'Current Inventory 4', key: 'currentInventory4', width: 18 },
                 { header: 'Updated Inventory 4', key: 'updatedInventory4', width: 18 },
-                { header: 'Expiry Date 4 (yyyy-mm-dd)', key: 'expiryDate4', width: 15 }
+                { header: 'Expiry Date 4 (yyyy-mm-dd)', key: 'expiryDate4', width: 15 },
+                { header: 'Current Inventory 5', key: 'currentInventory5', width: 18 },
+                { header: 'Updated Inventory 5', key: 'updatedInventory5', width: 18 },
+                { header: 'Expiry Date 5 (yyyy-mm-dd)', key: 'expiryDate5', width: 15 }
             ];
             worksheet.columns = headers;
 
@@ -358,12 +367,41 @@ export default {
             headerRow.height = 35; // Set height for the header row
             headerRow.eachCell((cell) => {
                 cell.alignment = { wrapText: true, vertical: 'middle', horizontal: 'center' }; // Enable text wrapping
+                cell.font = { bold: true }; // Make header text bold
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFCCCCCC' } // Light gray background for headers
+                };
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'FF000000' } },
+                    left: { style: 'thin', color: { argb: 'FF000000' } },
+                    bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                    right: { style: 'thin', color: { argb: 'FF000000' } }
+                };
             });
 
             // Add rows to the worksheet.
             this.excelRows.forEach(row => {
-                worksheet.addRow(row);
-                // worksheet.addRow();
+                const addedRow = worksheet.addRow(row);
+
+                // Apply color styling to "Updated Inventory" columns
+                headers.forEach((header, index) => {
+                    if (header.key && header.key.startsWith('updatedInventory')) {
+                        const cell = addedRow.getCell(index + 1); // Get the cell for the current column
+                        cell.fill = {
+                            type: 'pattern',
+                            pattern: 'solid',
+                            fgColor: { argb: 'FFCCE5FF' } // Light blue background for updated inventory
+                        };
+                        cell.border = {
+                            top: { style: 'thin', color: { argb: 'FF000000' } },
+                            left: { style: 'thin', color: { argb: 'FF000000' } },
+                            bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                            right: { style: 'thin', color: { argb: 'FF000000' } }
+                        };
+                    }
+                });
             });
 
             // Generate the excel file as a Blob and trigger the download.
