@@ -116,10 +116,10 @@ export default {
                 );
 
                 const totalInventory = (row.currentInventory1 ?? 0) +
-                        (row.currentInventory2 ?? 0) +
-                        (row.currentInventory3 ?? 0) +
-                        (row.currentInventory4 ?? 0) +
-                        (row.currentInventory5 ?? 0)
+                    (row.currentInventory2 ?? 0) +
+                    (row.currentInventory3 ?? 0) +
+                    (row.currentInventory4 ?? 0) +
+                    (row.currentInventory5 ?? 0)
                 const matchesTab = this.activeTab === 'All Inventory' ||
                     (this.activeTab === 'Low Inventory' && totalInventory < 50 && totalInventory > 0) ||
                     (this.activeTab === 'Out of Stock' && totalInventory === 0) ||
@@ -134,7 +134,7 @@ export default {
             }).map(row => {
                 return {
                     ...row,
-                    currentInventory:
+                    currentInventory: ['Near Expiry Inventory', 'Expired Inventory'].includes(this.activeTab) ? (row.currentInventory1 ?? 0) :
                         (row.currentInventory1 ?? 0) +
                         (row.currentInventory2 ?? 0) +
                         (row.currentInventory3 ?? 0) +
