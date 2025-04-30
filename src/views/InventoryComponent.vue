@@ -53,6 +53,7 @@
                         <td>{{ row.productTitle }}</td>
                         <td>{{ row.currentInventory }}</td>
                         <td>{{ row.expiryDate }}</td>
+                        <td>{{ row.salesLast15Days }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -91,12 +92,13 @@ export default {
             inventoryData: [],
             searchQuery: '',
             activeTab: 'All Inventory',
-            tabs: ['All Inventory', 'Low Inventory', 'Out of Stock', 'Near Expiry Inventory', 'Expired Inventory'],
+            tabs: ['All Inventory', 'Low Inventory', 'Out of Stock', 'Near Expiry Inventory', 'Expired Inventory', 'Slow Moving SKU'],
             columns: [
                 { key: 'skuCode', label: 'SKU Code*' },
                 { key: 'productTitle', label: 'Product Title*' },
                 { key: 'currentInventory', label: 'Current Inventory' },
                 { key: 'expiryDate', label: 'Expiry Date' },
+                { key: 'salesLast15Days', label: 'Sales Last 15 Days' }
             ],
             filters: {},
             sortConfig: { key: null, asc: true },
@@ -124,7 +126,8 @@ export default {
                     (this.activeTab === 'Low Inventory' && totalInventory < 50 && totalInventory > 0) ||
                     (this.activeTab === 'Out of Stock' && totalInventory === 0) ||
                     (this.activeTab === 'Near Expiry Inventory' && row.expiryDate1 && new Date(row.expiryDate1) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && new Date(row.expiryDate1) > new Date()) ||
-                    (this.activeTab === 'Expired Inventory' && row.expiryDate1 && new Date(row.expiryDate1) < new Date());
+                    (this.activeTab === 'Expired Inventory' && row.expiryDate1 && new Date(row.expiryDate1) < new Date()) ||
+                    (this.activeTab === 'Slow Moving SKU' && row.salesLast15Days == 0);
 
                 const matchesFilters = Object.entries(this.filters).every(([key, value]) =>
                     !value || String(row[key]).toLowerCase().includes(value.toLowerCase())
@@ -158,15 +161,16 @@ export default {
             // Same as before, transform API data
             const rows = [];
             this.inventoryData.forEach(item => {
-                if (item["Current Inventory"] && item["Current Inventory"].length) {
+                if (item.currentInventory && item.currentInventory.length) {
                     // For each inventory record, create a row.
                     const row = {
-                        skuCode: item["SKU Code"],
-                        productTitle: item["Product Title"],
-                        sapCode: item["SAP Code"],
-                        ean: item["EAN"],
+                        skuCode: item.skuCode,
+                        productTitle: item.productTitle,
+                        sapCode: item.sapCode,
+                        ean: item.ean,
+                        salesLast15Days: item.salesLast15Days
                     };
-                    item["Current Inventory"].forEach((inv, i) => {
+                    item.currentInventory.forEach((inv, i) => {
                         row[`currentInventory${i + 1}`] = inv.count;
                         row[`updatedInventory${i + 1}`] = '';
                         row[`expiryDate${i + 1}`] = inv.expiry ?? '';
@@ -175,11 +179,12 @@ export default {
                 } else {
                     // For SKUs with no inventory, add one row with 0 and a blank row below.
                     rows.push({
-                        skuCode: item["SKU Code"],
-                        productTitle: item["Product Title"],
-                        sapCode: item["SAP Code"],
-                        ean: item["EAN"],
-                        currentInventory1: 0
+                        skuCode: item.skuCode,
+                        productTitle: item.productTitle,
+                        sapCode: item.sapCode,
+                        ean: item.ean,
+                        currentInventory1: 0,
+                        salesLast15Days: item.salesLast15Days
                     });
                 }
             });
