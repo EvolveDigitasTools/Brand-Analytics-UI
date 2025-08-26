@@ -27,6 +27,7 @@ const menuItems = ref([
     // { title: 'Meesho Inventory', route: '/dashboard/meesho-inventory', avatar: '/assets/logo/meesho_logo.png' },
     // { title: 'Marketplace Orders', route: '/dashboard/marketplace-orders', icon: 'mdi-shopping' },
     { title: 'Update Orders', route: '/dashboard/update-orders', icon: 'mdi-package-up' },
+    { title: 'Update Daily Orders', route: '/dashboard/update-daily-orders', icon: 'mdi-package-up' },
     { title: 'SKU Mapping', route: '/dashboard/sku-mapping', icon: 'mdi-package-variant' },
 ])
 </script>

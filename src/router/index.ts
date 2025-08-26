@@ -6,6 +6,7 @@ import InventoryComponent from '@/views/InventoryComponent.vue'
 import OrderUpdateComponent from '@/views/OrderUpdateComponent.vue'
 import DashboardComponent from '@/views/DashboardComponent.vue'
 import SKUMappingComponent from '@/views/SKUMappingComponent.vue'
+import DailyOrderUpdateComponent from '@/views/DailyOrderUpdateComponent.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -20,6 +21,7 @@ const router = createRouter({
         { path: 'overview', component: DashboardComponent },
         { path: 'inventory/:vendorCode?', component: InventoryComponent },
         { path: 'update-orders', component: OrderUpdateComponent},
+        { path: 'update-daily-orders', component: DailyOrderUpdateComponent},
         { path: 'sku-mapping', component: SKUMappingComponent }
       ]
     }
