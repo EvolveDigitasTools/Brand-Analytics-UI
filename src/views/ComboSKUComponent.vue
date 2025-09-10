@@ -42,12 +42,30 @@ export default {
       uploading: false,
       progressPercent: 0,
       uploadSummary: null,
+      baseUrls: [
+        "https://brand-analytics-node.onrender.com",
+        "http://localhost:4000"
+      ],
     };
   },
   methods: {
     handleFileChange(event) {
       this.selectedFile = event.target.files[0];
     },
+
+    async fetchWithFallback(path, options) {
+      for (const base of this.baseUrls) {
+        try {
+          const response = await fetch(`${base}${path}`, options);
+          if (!response.ok) throw new Error("Server responded with error");
+          return response;
+        } catch (err) {
+          console.warn(`Failed on ${base}${path}, trying next...`);
+        }
+      }
+      throw new Error("All servers failed");
+    },
+
     async uploadFile() {
       if (!this.selectedFile) return alert("Please select a file");
 
@@ -58,42 +76,63 @@ export default {
       const formData = new FormData();
       formData.append("file", this.selectedFile);
 
-      // Use Fetch API because Axios doesn’t support streaming progress from server
-      const response = await fetch("http://localhost:4000/api/combo-sku/upload", {
-        method: "POST",
-        body: formData,
-      });
+      try {
+        // Try local first, fallback to live if fails
+        const response = await this.fetchWithFallback("/api/combo-sku/upload", {
+          method: "POST",
+          body: formData,
+        });
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
 
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
-        const messages = buffer.split("\n");
+          buffer += decoder.decode(value, { stream: true });
+          const messages = buffer.split("\n");
 
-        // Process complete lines
-        buffer = messages.pop();
-        for (const msg of messages) {
-          if (!msg.trim()) continue;
-          const data = JSON.parse(msg);
-          if (data.type === "progress") {
-            this.progressPercent = data.percent;
-          } else if (data.type === "done") {
-            this.uploading = false;
-            this.uploadSummary = data.summary;
+          buffer = messages.pop(); // keep incomplete line
+          for (const msg of messages) {
+            if (!msg.trim()) continue;
+            const data = JSON.parse(msg);
+            if (data.type === "progress") {
+              this.progressPercent = data.percent;
+            } else if (data.type === "done") {
+              this.uploading = false;
+              this.uploadSummary = data.summary;
+            }
           }
         }
+      } catch (error) {
+        this.uploading = false;
+        alert("Upload failed on both local and live server: " + error.message);
       }
     },
-    downloadTemplate() {
-      window.location.href = "http://localhost:4000/api/combo-sku/template";
+
+    async downloadTemplate() {
+      try {
+        const response = await this.fetchWithFallback("/api/combo-sku/template", {
+          method: "GET",
+        });
+
+        // Convert response to Blob and trigger download
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "sku-mapping-template.xlsx";
+        link.click();
+        window.URL.revokeObjectURL(url);
+      } catch (error) {
+        alert("Failed to download template from both servers: " + error.message);
+      }
     },
   },
 };
+
 </script>
 
 <style scoped>
