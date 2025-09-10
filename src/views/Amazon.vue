@@ -46,33 +46,47 @@ export default {
       file: null,
       results: [],
       loading: false,
+      baseUrls: [
+        "https://brand-analytics-node.onrender.com",
+        "http://localhost:4000"
+      ],
     };
   },
   methods: {
     onFileChange(e) {
       this.file = e.target.files[0];
     },
+
     async uploadFile() {
       if (!this.file) return;
 
       this.loading = true;
       this.results = [];
 
-      try {
-        const formData = new FormData();
-        formData.append("file", this.file);
+      const formData = new FormData();
+      formData.append("file", this.file);
 
-        const res = await axios.post("http://localhost:4000/upload-amazon", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+      let uploaded = false;
 
-        this.results = res.data.results;
-      } catch (err) {
-        console.error(err);
-        alert("Upload failed!");
-      } finally {
-        this.loading = false;
+      for (const base of this.baseUrls) {
+        try {
+          const res = await axios.post(`${base}/upload-amazon`, formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+
+          this.results = res.data.results;
+          uploaded = true;
+          break; // ✅ stop trying if successful
+        } catch (err) {
+          console.warn(`Failed to upload to ${base}/upload-amazon, trying next...`, err.message);
+        }
       }
+
+      if (!uploaded) {
+        alert("Upload failed on both live and local servers!");
+      }
+
+      this.loading = false;
     },
   },
 };
