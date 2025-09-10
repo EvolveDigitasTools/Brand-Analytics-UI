@@ -24,10 +24,13 @@ import { ref } from 'vue'
 const menuItems = ref([
     { title: 'Overview', route: '/dashboard/overview', icon: 'mdi-view-dashboard' },
     { title: 'Inventory', route: '/dashboard/inventory', icon: 'mdi-package' },
+    // { title: 'All Inventory', route: '/dashboard/all-inventory', icon: 'mdi-package' }, //All Inventory - H    
     // { title: 'Meesho Inventory', route: '/dashboard/meesho-inventory', avatar: '/assets/logo/meesho_logo.png' },
     // { title: 'Marketplace Orders', route: '/dashboard/marketplace-orders', icon: 'mdi-shopping' },
-    { title: 'Update Orders', route: '/dashboard/update-orders', icon: 'mdi-package-up' },
-    { title: 'Update Daily Orders', route: '/dashboard/update-daily-orders', icon: 'mdi-package-up' },
-    { title: 'SKU Mapping', route: '/dashboard/sku-mapping', icon: 'mdi-package-variant' },
+    // { title: 'Update Orders', route: '/dashboard/update-orders', icon: 'mdi-package-up' },
+    { title: 'Update Orders', route: '/dashboard/update-daily-orders', icon: 'mdi-package-up' },
+    // { title: 'Update Daily Orders', route: '/dashboard/update-daily-orders', icon: 'mdi-package-up' },//Backup   
+    // { title: 'SKU Mapping', route: '/dashboard/sku-mapping', icon: 'mdi-package-variant' },
+    { title: 'SKU Mapping', route: '/dashboard/combo-sku', icon: 'mdi-package-variant' }, // H
 ])
 </script>

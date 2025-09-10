@@ -1,91 +1,51 @@
 <template>
-    <div class="meesho-heading"><h4 class="meesho-text">Upload Meesho Inventory Sheet</h4></div>
+    <div class="marketplaces-heading"><h4 class="marketplaces-text">Upload Daily Inventory Sheet</h4></div>
     
-  <div class="upload-page">
-    <h2>Upload Meesho Inventory Sheet</h2>
+        <div class="mrkt-btn">
+            <div class="sheet-btn">
+                <!-- Button to go to Meesho component -->
+                <button @click="goToMeesho">Meesho</button>
+            </div>
 
-    <input type="file" @change="onFileChange" accept=".xlsx,.xls,.csv" />
+            <div class="sheet-btn">
+                <!-- Button to go to Meesho component -->
+                <button @click="goToAmazon">Amazon</button>
+            </div>
 
-    <button @click="uploadFile" :disabled="!file">Upload</button>
+            <div class="sheet-btn">
+                <!-- Button to go to Meesho component -->
+                <button @click="goToFlipkart">Flipkart</button>
+            </div>
+        </div>
 
-    <div v-if="loading">Uploading...</div>
-
-    <div v-if="results.length">
-      <h3>Results:</h3>
-      <table border="1" cellpadding="6">
-        <thead>
-          <tr>
-            <th>SKU Code</th>
-            <th>Old Qty</th>
-            <th>Deducted</th>
-            <th>New Qty</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(r, index) in results" :key="index">
-            <td>{{ r.skuCode }}</td>
-            <td>{{ r.oldQty ?? "-" }}</td>
-            <td>{{ r.deducted ?? "-" }}</td>
-            <td>{{ r.newQty ?? "-" }}</td>
-            <td>{{ r.error ? r.error : "Updated" }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
 </template>
 
 <script>
-import axios from "axios";
 
 export default {
-  name: "UploadMeesho",
-  data() {
-    return {
-      file: null,
-      results: [],
-      loading: false,
-    };
-  },
+  name: "MarketplaceButton",
   methods: {
-    onFileChange(e) {
-      this.file = e.target.files[0];
+    goToMeesho() {
+      this.$router.push({ name: "Meesho" }); 
     },
-    async uploadFile() {
-      if (!this.file) return;
-
-      this.loading = true;
-      this.results = [];
-
-      try {
-        const formData = new FormData();
-        formData.append("file", this.file);
-
-        const res = await axios.post("http://localhost:4000/upload", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-
-        this.results = res.data.results;
-      } catch (err) {
-        console.error(err);
-        alert("Upload failed!");
-      } finally {
-        this.loading = false;
-      }
+    goToAmazon() {
+      this.$router.push({ name: "Amazon" }); 
+    },
+    goToFlipkart() {
+      this.$router.push({ name: "Flipkart" }); 
     },
   },
 };
 </script>
 
 <style scoped>
-.meesho-heading {
+.marketplaces-heading {
     height: fit-content;
     width: fit-content;
     margin: 20px 0 20px 100px;
 }
 
-.meesho-text {
+.marketplaces-text {
     font-size: 2.125rem !important;
     font-weight: 400;
     line-height: 1.175;
@@ -93,6 +53,13 @@ export default {
     font-family: "Roboto", sans-serif;
     text-transform: none !important;
 }
+
+.mrkt-btn {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+}
+
 .upload-page {
   max-width: 700px;
   margin: 20px auto;
@@ -102,16 +69,24 @@ export default {
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 button {
-  margin-top: 10px;
-  padding: 8px 16px;
-  background: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 5px;
+  color: #090909;
+  padding: 0.7em 1.7em;
+  font-size: 18px;
+  border-radius: 0.5em;
+  background: #e8e8e8;
   cursor: pointer;
+  border: 1px solid #e8e8e8;
+  transition: all 0.3s;
+  box-shadow: 6px 6px 12px #c5c5c5, -6px -6px 12px #ffffff;
 }
-button:disabled {
-  background: #ccc;
-  cursor: not-allowed;
+button:hover{
+    background: #e8e8e8;
+    transform: translate(-0.25rem, -0.25rem);
+    background: var(--hover-bg);
+    box-shadow: 0.25rem 0.25rem var(--bg);
+}
+button:active {
+  color: #666;
+  box-shadow: inset 4px 4px 12px #c5c5c5, inset -4px -4px 12px #ffffff;
 }
 </style>
