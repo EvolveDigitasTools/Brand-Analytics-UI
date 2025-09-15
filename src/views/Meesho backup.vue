@@ -1,16 +1,14 @@
 <template>
-  <div class="meesho-heading"><h4 class="meesho-text">Upload Meesho Inventory Sheet</h4></div>
-  
+    <div class="meesho-heading"><h4 class="meesho-text">Upload Meesho Inventory Sheet</h4></div>
+    
   <div class="upload-page">
+    <!-- <h2>Upload Meesho Inventory Sheet</h2> -->
+
     <input type="file" @change="onFileChange" accept=".xlsx,.xls,.csv" />
 
     <button @click="uploadFile" :disabled="!file">Upload</button>
 
-    <!-- ✅ Progress Bar -->
-    <div v-if="uploading" class="progress-container">
-      <div class="progress-bar" :style="{ width: progressPercent + '%' }"></div>
-      <span>{{ progressPercent }}%</span>
-    </div>
+    <div v-if="loading">Uploading...</div>
 
     <div v-if="results.length">
       <h3>Results:</h3>
@@ -26,7 +24,7 @@
         </thead>
         <tbody>
           <tr v-for="(r, index) in results" :key="index">
-            <td>{{ r.originalSku || r.comboSku }}</td>
+            <td>{{ r.originalSku || (r.comboSku) }}</td>
             <td>{{ r.oldQty ?? "-" }}</td>
             <td>{{ r.deducted ?? "-" }}</td>
             <td>{{ r.newQty ?? "-" }}</td>
@@ -47,10 +45,9 @@ export default {
     return {
       file: null,
       results: [],
-      uploading: false,
-      progressPercent: 0,
+      loading: false,
       baseUrls: [
-        "https://brand-analytics-node.onrender.com",
+        // "https://brand-analytics-node.onrender.com",
         "http://localhost:4000"
       ],
     };
@@ -63,8 +60,7 @@ export default {
     async uploadFile() {
       if (!this.file) return;
 
-      this.uploading = true;
-      this.progressPercent = 0;
+      this.loading = true;
       this.results = [];
 
       const formData = new FormData();
@@ -76,18 +72,11 @@ export default {
         try {
           const res = await axios.post(`${base}/upload`, formData, {
             headers: { "Content-Type": "multipart/form-data" },
-            onUploadProgress: (progressEvent) => {
-              if (progressEvent.total) {
-                this.progressPercent = Math.round(
-                  (progressEvent.loaded * 100) / progressEvent.total
-                );
-              }
-            }
           });
 
           this.results = res.data.results;
           uploaded = true;
-          break;
+          break; // ✅ stop if successful
         } catch (err) {
           console.warn(`Failed to upload to ${base}, trying next...`, err.message);
         }
@@ -97,7 +86,7 @@ export default {
         alert("Upload failed on both live and local servers!");
       }
 
-      this.uploading = false;
+      this.loading = false;
     },
   },
 };
@@ -105,20 +94,19 @@ export default {
 
 <style scoped>
 .meesho-heading {
-  height: fit-content;
-  width: fit-content;
-  margin: 20px 0 20px 100px;
+    height: fit-content;
+    width: fit-content;
+    margin: 20px 0 20px 100px;
 }
 
 .meesho-text {
-  font-size: 2.125rem !important;
-  font-weight: 400;
-  line-height: 1.175;
-  letter-spacing: 0.0073529412em !important;
-  font-family: "Roboto", sans-serif;
-  text-transform: none !important;
+    font-size: 2.125rem !important;
+    font-weight: 400;
+    line-height: 1.175;
+    letter-spacing: 0.0073529412em !important;
+    font-family: "Roboto", sans-serif;
+    text-transform: none !important;
 }
-
 .upload-page {
   max-width: 700px;
   justify-content: center;
@@ -129,63 +117,17 @@ export default {
   border-radius: 8px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
-input {
-  border: 1px solid;
-  border-radius: 5px;
-  width: 85%;
-}
-
 button {
-  margin: 10px 0 10px 10px;
-  padding: 5px 16px;
+  margin-top: 10px;
+  padding: 8px 16px;
   background: #4CAF50;
   color: white;
   border: none;
   border-radius: 5px;
   cursor: pointer;
 }
-
 button:disabled {
   background: #ccc;
   cursor: not-allowed;
-}
-
-.progress-container {
-  margin-top: 10px;
-  background: #eee;
-  border-radius: 8px;
-  position: relative;
-  height: 20px;
-  width: 100%;
-  overflow: hidden;
-}
-
-.progress-bar {
-  background: #4caf50;
-  height: 100%;
-  transition: width 0.2s ease;
-}
-
-.progress-container span {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 12px;
-  color: #333;
-}
-
-table {
-  width: 100%;
-  text-indent: 10px;
-  text-align: left;
-}
-
-thead {
-  background: #ededed;
-}
-
-table, td, tr {
-      border: 1px solid #d3cbcb;
 }
 </style>
