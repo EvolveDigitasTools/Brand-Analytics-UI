@@ -1,5 +1,5 @@
 <template>
-    <div class="flipkart-heading"><h4 class="flipkart-text">Upload Flipkart Inventory Sheet</h4></div>
+  <div class="flipkart-heading"><h4 class="flipkart-text">Upload Flipkart Inventory Sheet</h4></div>
     
   <div class="upload-page">
     <!-- <h2>Upload Flipkart Inventory Sheet</h2> -->

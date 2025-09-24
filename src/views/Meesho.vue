@@ -1,12 +1,10 @@
 <template>
   <div class="meesho-heading"><h4 class="meesho-text">Upload Meesho Inventory Sheet</h4></div>
-  
+
   <div class="upload-page">
     <input type="file" @change="onFileChange" accept=".xlsx,.xls,.csv" />
-
     <button @click="uploadFile" :disabled="!file">Upload</button>
 
-    <!-- ✅ Progress Bar -->
     <div v-if="uploading" class="progress-container">
       <div class="progress-bar" :style="{ width: progressPercent + '%' }"></div>
       <span>{{ progressPercent }}%</span>
@@ -17,6 +15,7 @@
       <table border="1" cellpadding="6">
         <thead>
           <tr>
+            <th>#</th>
             <th>SKU Code</th>
             <th>Old Qty</th>
             <th>Deducted</th>
@@ -26,7 +25,8 @@
         </thead>
         <tbody>
           <tr v-for="(r, index) in results" :key="index">
-            <td>{{ r.originalSku || r.comboSku }}</td>
+            <td>{{ index + 1 }}</td>
+            <td>{{ r.uploadedSku }}</td>
             <td>{{ r.oldQty ?? "-" }}</td>
             <td>{{ r.deducted ?? "-" }}</td>
             <td>{{ r.newQty ?? "-" }}</td>
@@ -39,20 +39,13 @@
 </template>
 
 <script>
-import axios from "axios";
-
 export default {
-  name: "UploadMeesho",
   data() {
     return {
       file: null,
       results: [],
       uploading: false,
       progressPercent: 0,
-      baseUrls: [
-        "https://brand-analytics-node.onrender.com",
-        "http://localhost:4000"
-      ],
     };
   },
   methods: {
@@ -60,48 +53,58 @@ export default {
       this.file = e.target.files[0];
     },
 
-    async uploadFile() {
+    uploadFile() {
       if (!this.file) return;
-
-      this.uploading = true;
-      this.progressPercent = 0;
-      this.results = [];
 
       const formData = new FormData();
       formData.append("file", this.file);
 
-      let uploaded = false;
+      this.results = [];
+      this.progressPercent = 0;
+      this.uploading = true;
 
-      for (const base of this.baseUrls) {
-        try {
-          const res = await axios.post(`${base}/upload`, formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-            onUploadProgress: (progressEvent) => {
-              if (progressEvent.total) {
-                this.progressPercent = Math.round(
-                  (progressEvent.loaded * 100) / progressEvent.total
-                );
+      // Create a temporary hidden form + submit via fetch to initiate SSE
+      fetch("http://localhost:4000/meesho-sse", {
+        method: "POST",
+        body: formData,
+      })
+        .then((res) => {
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+
+          const read = () => {
+            reader.read().then(({ done, value }) => {
+              if (done) {
+                this.uploading = false;
+                return;
               }
-            }
-          });
+              const chunk = decoder.decode(value, { stream: true });
+              const lines = chunk.split("\n").filter(Boolean);
 
-          this.results = res.data.results;
-          uploaded = true;
-          break;
-        } catch (err) {
-          console.warn(`Failed to upload to ${base}, trying next...`, err.message);
-        }
-      }
+              lines.forEach((line) => {
+                if (line.startsWith("data:")) {
+                  const obj = JSON.parse(line.replace("data: ", ""));
+                  if (obj.latest) this.results.push(obj.latest);
+                  if (obj.progressPercent !== undefined) this.progressPercent = obj.progressPercent;
+                  if (obj.done) this.uploading = false;
+                }
+              });
 
-      if (!uploaded) {
-        alert("Upload failed on both live and local servers!");
-      }
+              read();
+            });
+          };
 
-      this.uploading = false;
+          read();
+        })
+        .catch((err) => {
+          console.error("SSE upload failed:", err);
+          this.uploading = false;
+        });
     },
   },
 };
 </script>
+
 
 <style scoped>
 .meesho-heading {
@@ -120,7 +123,7 @@ export default {
 }
 
 .upload-page {
-  max-width: 700px;
+  max-width: 900px;
   justify-content: center;
   align-items: center;
   margin: 20px auto;
@@ -183,6 +186,8 @@ table {
 
 thead {
   background: #ededed;
+  width: 100%;
+  height: 30px;
 }
 
 table, td, tr {
