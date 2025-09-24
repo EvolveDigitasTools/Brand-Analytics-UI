@@ -64,7 +64,7 @@ export default {
       this.uploading = true;
 
       // Create a temporary hidden form + submit via fetch to initiate SSE
-      fetch("http://localhost:4000/meesho-sse", {
+      fetch("https://brand-analytics-node.onrender.com/meesho-sse", {
         method: "POST",
         body: formData,
       })
