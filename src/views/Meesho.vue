@@ -10,13 +10,15 @@
       <span>{{ progressPercent }}%</span>
     </div>
 
-    <div v-if="results.length">
+    <div v-if="results.length" class="results-container">
       <h3>Results:</h3>
       <table border="1" cellpadding="6">
         <thead>
           <tr>
             <th>#</th>
             <th>SKU Code</th>
+            <!-- <th>Reason</th> -->
+            <!-- <th>Child SKU</th> -->
             <th>Old Qty</th>
             <th>Deducted</th>
             <th>New Qty</th>
@@ -24,9 +26,11 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(r, index) in results" :key="index">
+          <tr v-for="(r, index) in results" :key="r.uploadedSku + '_' + index">
             <td>{{ index + 1 }}</td>
-            <td>{{ r.uploadedSku }}</td>
+            <td>{{ r.uploadedSku || r.comboSku || r.skuCode || "-" }}</td>
+            <!-- <td>{{ r.reason ?? "-" }}</td> -->
+            <!-- <td>{{ r.childSku ? r.childSku : (r.type === "normal" ? "-" : "") }}</td> -->
             <td>{{ r.oldQty ?? "-" }}</td>
             <td>{{ r.deducted ?? "-" }}</td>
             <td>{{ r.newQty ?? "-" }}</td>
@@ -35,6 +39,7 @@
         </tbody>
       </table>
     </div>
+    <div v-if="error" class="error-message">{{ error }}</div>
   </div>
 </template>
 
@@ -46,11 +51,14 @@ export default {
       results: [],
       uploading: false,
       progressPercent: 0,
+      error: null,
     };
   },
   methods: {
     onFileChange(e) {
       this.file = e.target.files[0];
+      this.results = [];
+      this.error = null;
     },
 
     uploadFile() {
@@ -62,13 +70,17 @@ export default {
       this.results = [];
       this.progressPercent = 0;
       this.uploading = true;
+      this.error = null;
 
-      // Create a temporary hidden form + submit via fetch to initiate SSE
-      fetch("https://brand-analytics-node.onrender.com/meesho-sse", {
+      fetch(`${import.meta.env.VITE_BACKEND_NODE}/meesho-sse`,
+        {
         method: "POST",
         body: formData,
       })
         .then((res) => {
+          if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+          }
           const reader = res.body.getReader();
           const decoder = new TextDecoder();
 
@@ -76,21 +88,45 @@ export default {
             reader.read().then(({ done, value }) => {
               if (done) {
                 this.uploading = false;
+                console.log("Stream completed, total results:", this.results.length);
                 return;
               }
               const chunk = decoder.decode(value, { stream: true });
+              console.log("Received chunk:", chunk);
               const lines = chunk.split("\n").filter(Boolean);
 
               lines.forEach((line) => {
                 if (line.startsWith("data:")) {
-                  const obj = JSON.parse(line.replace("data: ", ""));
-                  if (obj.latest) this.results.push(obj.latest);
-                  if (obj.progressPercent !== undefined) this.progressPercent = obj.progressPercent;
-                  if (obj.done) this.uploading = false;
+                  try {
+                    const obj = JSON.parse(line.replace("data: ", ""));
+                    if (obj.uploadedSku || obj.error) { // Individual result
+                      this.results.push(obj); // Add each update instantly
+                      this.$nextTick(() => {
+                        // Ensure DOM updates after state change
+                      });
+                    }
+                    if (obj.progressPercent !== undefined) {
+                      this.progressPercent = obj.progressPercent; // Real-time progress
+                    }
+                    if (obj.error && !obj.uploadedSku) { // Global error
+                      this.results.push({ error: obj.error });
+                    }
+                    if (obj.done) {
+                      this.uploading = false;
+                    }
+                  } catch (parseErr) {
+                    console.error("Error parsing SSE data:", parseErr, line);
+                    this.error = `Parsing error: ${parseErr.message}`;
+                  }
                 }
               });
 
-              read();
+              read(); // Continue reading the stream
+            }).catch((err) => {
+              console.error("Error reading stream:", err);
+              this.uploading = false;
+              this.error = `Stream read failed: ${err.message}`;
+              this.results.push({ error: `Stream read failed: ${err.message}` });
             });
           };
 
@@ -99,12 +135,13 @@ export default {
         .catch((err) => {
           console.error("SSE upload failed:", err);
           this.uploading = false;
+          this.error = `Upload failed: ${err.message}`;
+          this.results.push({ error: `Upload failed: ${err.message}` });
         });
     },
   },
 };
 </script>
-
 
 <style scoped>
 .meesho-heading {
@@ -132,6 +169,7 @@ export default {
   border-radius: 8px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
+
 input {
   border: 1px solid;
   border-radius: 5px;
@@ -178,6 +216,10 @@ button:disabled {
   color: #333;
 }
 
+.results-container {
+  margin-top: 10px;
+}
+
 table {
   width: 100%;
   text-indent: 10px;
@@ -191,6 +233,12 @@ thead {
 }
 
 table, td, tr {
-      border: 1px solid #d3cbcb;
+  border: 1px solid #d3cbcb;
+}
+
+.error-message {
+  color: red;
+  margin-top: 10px;
+  font-weight: bold;
 }
 </style>

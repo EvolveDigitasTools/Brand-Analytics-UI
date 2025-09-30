@@ -42,9 +42,7 @@ export default {
       uploading: false,
       progressPercent: 0,
       uploadSummary: null,
-      baseUrls: [
-        "https://brand-analytics-node.onrender.com",
-        "http://localhost:4000"
+      baseUrls: [`${import.meta.env.VITE_BACKEND_NODE}`
       ],
     };
   },

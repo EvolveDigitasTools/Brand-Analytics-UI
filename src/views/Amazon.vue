@@ -46,9 +46,7 @@ export default {
       file: null,
       results: [],
       loading: false,
-      baseUrls: [
-        "https://brand-analytics-node.onrender.com",
-        "http://localhost:4000"
+      baseUrls: [`${import.meta.env.VITE_BACKEND_NODE}`
       ],
     };
   },
