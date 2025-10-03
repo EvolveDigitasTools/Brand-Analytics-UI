@@ -38,20 +38,7 @@
                             <div class="column-header">
                                 <span>{{ column.label }}</span>
                                 <div class="filter-controls">
-                                    <template v-if="column.key === 'expiryDate'">
-                                        <div class="expiry-filter-wrapper">
-                                            <v-select
-                                                v-model="filters.expiryYearMonth"
-                                                :items="yearMonthOptions"
-                                                label="Year-Month"
-                                                class="filter-select"
-                                                clearable
-                                                dense
-                                                @update:modelValue="onExpiryFilterChange"
-                                            ></v-select>
-                                        </div>
-                                    </template>
-                                    <input v-else v-model="filters[column.key]" @click.stop class="filter-input" />
+                                    <input v-model="filters[column.key]" @click.stop class="filter-input" />
                                     <button @click="toggleSort(column.key)" class="sort-btn">
                                         {{ sortConfig.key === column.key ? (sortConfig.asc ? '↑' : '↓') : '⇅' }}
                                     </button>
@@ -113,88 +100,41 @@ export default {
                 { key: 'expiryDate', label: 'Expiry Date' },
                 { key: 'salesLast15Days', label: 'Sales Last 15 Days' }
             ],
-            filters: {
-                expiryYearMonth: null
-            },
+            filters: {},
             sortConfig: { key: null, asc: true },
             showUpdateModal: false,
             uploadLoading: false,
             vendors: [],
             selectedVendor: 'All',
             inventoryUpdateDate: new Date().toISOString().substr(0, 10),
-            yearOptions: Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 0 + i), // e.g., 2025-2034
-            monthOptions: [
-                { text: 'January', value: '01' },
-                { text: 'February', value: '02' },
-                { text: 'March', value: '03' },
-                { text: 'April', value: '04' },
-                { text: 'May', value: '05' },
-                { text: 'June', value: '06' },
-                { text: 'July', value: '07' },
-                { text: 'August', value: '08' },
-                { text: 'September', value: '09' },
-                { text: 'October', value: '10' },
-                { text: 'November', value: '11' },
-                { text: 'December', value: '12' }
-            ]
         };
     },
     computed: {
-        yearMonthOptions() {
-            const options = [];
-            this.yearOptions.forEach(year => {
-                this.monthOptions.forEach(month => {
-                    options.push(`${year}-${month.value}`);
-                });
-            });
-            return options;
-        },
         filteredRows() {
-            let filtered = this.excelRows;
+            let filtered = this.excelRows.filter(row => {
+                const matchesSearch = this.searchQuery.toLowerCase().split(' ').every(term =>
+                    row.skuCode.toLowerCase().includes(term) ||
+                    row.productTitle.toLowerCase().includes(term)
+                );
 
-            // If expiryYearMonth is set, filter strictly by that year-month
-            if (this.filters.expiryYearMonth) {
-                const [filterYear, filterMonth] = this.filters.expiryYearMonth.split('-');
-                filtered = filtered.filter(row => {
-                    if (!row.expiryDate1) return false;
-                    const date = new Date(row.expiryDate1);
-                    const rowYear = date.getFullYear().toString();
-                    const rowMonth = (date.getMonth() + 1).toString().padStart(2, '0');
-                    return rowYear === filterYear && rowMonth === filterMonth;
-                });
-            } else {
-                // Apply other filters only when no year-month is selected
-                filtered = filtered.filter(row => {
-                    const matchesSearch = this.searchQuery.toLowerCase().split(' ').every(term =>
-                        row.skuCode.toLowerCase().includes(term) ||
-                        row.productTitle.toLowerCase().includes(term)
-                    );
+                const totalInventory = (row.currentInventory1 ?? 0) +
+                    (row.currentInventory2 ?? 0) +
+                    (row.currentInventory3 ?? 0) +
+                    (row.currentInventory4 ?? 0) +
+                    (row.currentInventory5 ?? 0)
+                const matchesTab = this.activeTab === 'All Inventory' ||
+                    (this.activeTab === 'Low Inventory' && totalInventory < 50 && totalInventory > 0) ||
+                    (this.activeTab === 'Out of Stock' && totalInventory === 0) ||
+                    (this.activeTab === 'Near Expiry Inventory' && row.expiryDate1 && new Date(row.expiryDate1) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && new Date(row.expiryDate1) > new Date()) ||
+                    (this.activeTab === 'Expired Inventory' && row.expiryDate1 && new Date(row.expiryDate1) < new Date()) ||
+                    (this.activeTab === 'Slow Moving SKU' && row.salesLast15Days == 0);
 
-                    const totalInventory = (row.currentInventory1 ?? 0) +
-                        (row.currentInventory2 ?? 0) +
-                        (row.currentInventory3 ?? 0) +
-                        (row.currentInventory4 ?? 0) +
-                        (row.currentInventory5 ?? 0);
-                    const matchesTab = this.activeTab === 'All Inventory' ||
-                        (this.activeTab === 'Low Inventory' && totalInventory < 50 && totalInventory > 0) ||
-                        (this.activeTab === 'Out of Stock' && totalInventory === 0) ||
-                        (this.activeTab === 'Near Expiry Inventory' && row.expiryDate1 && new Date(row.expiryDate1) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && new Date(row.expiryDate1) > new Date()) ||
-                        (this.activeTab === 'Expired Inventory' && row.expiryDate1 && new Date(row.expiryDate1) < new Date()) ||
-                        (this.activeTab === 'Slow Moving SKU' && row.salesLast15Days == 0);
+                const matchesFilters = Object.entries(this.filters).every(([key, value]) =>
+                    !value || String(row[key]).toLowerCase().includes(value.toLowerCase())
+                );
 
-                    const matchesFilters = Object.entries(this.filters).every(([key, value]) => {
-                        if (key === 'expiryYearMonth' && !value) return true;
-                        if (key !== 'expiryYearMonth') {
-                            return !value || String(row[key]).toLowerCase().includes(value.toLowerCase());
-                        }
-                        return true;
-                    });
-
-                    return matchesSearch && matchesTab && matchesFilters;
-                });
-            }
-
-            filtered = filtered.map(row => {
+                return matchesSearch && matchesTab && matchesFilters;
+            }).map(row => {
                 return {
                     ...row,
                     currentInventory: ['Near Expiry Inventory', 'Expired Inventory'].includes(this.activeTab) ? (row.currentInventory1 ?? 0) :
@@ -484,9 +424,6 @@ export default {
             } catch (error) {
                 console.error('Error generating excel file:', error);
             }
-        },
-        onExpiryFilterChange() {
-            this.$forceUpdate();
         }
     },
     mounted() {
@@ -569,21 +506,6 @@ th {
 .filter-controls {
     display: flex;
     gap: 5px;
-    align-items: center;
-    /* flex-wrap: wrap; */
-    /* min-width: 250px; */
-}
-
-.filter-select {
-    max-width: 150px; /* Adjusted for single dropdown */
-    min-width: 150px;
-    margin: 2px 0;
-    padding-right: 0px
-}
-
-.v-input--density-default .v-field--variant-solo, .v-input--density-default .v-field--variant-solo-inverted, .v-input--density-default .v-field--variant-solo-filled, .v-input--density-default .v-field--variant-filled {
-    --v-input-control-height: 50px;
-    --v-field-padding-bottom: 4px;
 }
 
 .filter-input {
@@ -591,11 +513,6 @@ th {
     width: 100%;
     max-width: 120px;
     border: 1px solid #ddd;
-}
-
-.expiry-filter-wrapper {
-    display: flex;
-    gap: 5px;
 }
 
 .sort-btn {
@@ -692,9 +609,5 @@ th {
     /* Set a minimum width */
     max-width: 100%;
     /* Allow it to grow as needed */
-}
-
-.v-menu__content {
-    z-index: 1000 !important;
 }
 </style>
