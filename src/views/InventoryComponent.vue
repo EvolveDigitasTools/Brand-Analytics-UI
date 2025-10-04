@@ -43,7 +43,7 @@
                                             <v-select
                                                 v-model="filters.expiryYearMonth"
                                                 :items="yearMonthOptions"
-                                                label="Year-Month"
+                                                label="YYYY/MM"
                                                 class="filter-select"
                                                 clearable
                                                 dense
@@ -65,7 +65,11 @@
                         <td>{{ row.skuCode }}</td>
                         <td>{{ row.productTitle }}</td>
                         <td>{{ row.currentInventory }}</td>
-                        <td>{{ row.expiryDate }}</td>
+                        <td>
+                            <span v-for="(detail, index) in row.expiryDetails" :key="index">
+                                {{ detail.expiryDate }}({{ detail.count }}){{ index < row.expiryDetails.length - 1 ? ', ' : '' }}
+                            </span>
+                        </td>
                         <td>{{ row.salesLast15Days }}</td>
                     </tr>
                 </tbody>
@@ -122,7 +126,7 @@ export default {
             vendors: [],
             selectedVendor: 'All',
             inventoryUpdateDate: new Date().toISOString().substr(0, 10),
-            yearOptions: Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 0 + i), // e.g., 2025-2034
+            yearOptions: Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 0 + i), // e.g., 2020-2029
             monthOptions: [
                 { text: 'January', value: '01' },
                 { text: 'February', value: '02' },
@@ -149,18 +153,71 @@ export default {
             });
             return options;
         },
+        excelRows() {
+            const rows = [];
+            this.inventoryData.forEach(item => {
+                if (item.currentInventory && item.currentInventory.length) {
+                const row = {
+                    skuCode: item.skuCode,
+                    productTitle: item.productTitle,
+                    sapCode: item.sapCode,
+                    ean: item.ean,
+                    salesLast15Days: item.salesLast15Days,
+                    expiryDetails: []
+                };
+
+                let totalCount = 0;
+                // Collect all expiry dates and counts
+                for (let i = 1; i <= 5; i++) {
+                    const record = item.currentInventory[i - 1];
+                    if (record) {
+                        totalCount += record.count || 0;
+                        if (record.expiry) {
+                            row.expiryDetails.push({
+                                expiryDate: record.expiry,
+                                count: record.count
+                            });
+                        }
+                    }
+                }
+
+                // ✅ If no expiry dates exist, still show total inventory (non-expiry stock)
+                if (row.expiryDetails.length === 0 && totalCount > 0) {
+                    row.expiryDetails.push({
+                        expiryDate: null,
+                        count: totalCount
+                    });
+                }
+
+                rows.push(row);
+            } else {
+                rows.push({
+                    skuCode: item.skuCode,
+                    productTitle: item.productTitle,
+                    sapCode: item.sapCode,
+                    ean: item.ean,
+                    currentInventory1: 0,
+                    salesLast15Days: item.salesLast15Days,
+                    expiryDetails: []
+                });
+            }
+            });
+            return rows;
+        },
         filteredRows() {
             let filtered = this.excelRows;
 
-            // If expiryYearMonth is set, filter strictly by that year-month
+            // If expiryYearMonth is set, filter strictly by that year-month across all expiry dates
             if (this.filters.expiryYearMonth) {
                 const [filterYear, filterMonth] = this.filters.expiryYearMonth.split('-');
                 filtered = filtered.filter(row => {
-                    if (!row.expiryDate1) return false;
-                    const date = new Date(row.expiryDate1);
-                    const rowYear = date.getFullYear().toString();
-                    const rowMonth = (date.getMonth() + 1).toString().padStart(2, '0');
-                    return rowYear === filterYear && rowMonth === filterMonth;
+                    return row.expiryDetails.some(detail => {
+                        if (!detail.expiryDate) return false;
+                        const date = new Date(detail.expiryDate);
+                        const rowYear = date.getFullYear().toString();
+                        const rowMonth = (date.getMonth() + 1).toString().padStart(2, '0');
+                        return rowYear === filterYear && rowMonth === filterMonth;
+                    });
                 });
             } else {
                 // Apply other filters only when no year-month is selected
@@ -170,16 +227,12 @@ export default {
                         row.productTitle.toLowerCase().includes(term)
                     );
 
-                    const totalInventory = (row.currentInventory1 ?? 0) +
-                        (row.currentInventory2 ?? 0) +
-                        (row.currentInventory3 ?? 0) +
-                        (row.currentInventory4 ?? 0) +
-                        (row.currentInventory5 ?? 0);
+                    const totalInventory = row.expiryDetails.reduce((sum, detail) => sum + (detail.count || 0), 0);
                     const matchesTab = this.activeTab === 'All Inventory' ||
                         (this.activeTab === 'Low Inventory' && totalInventory < 50 && totalInventory > 0) ||
                         (this.activeTab === 'Out of Stock' && totalInventory === 0) ||
-                        (this.activeTab === 'Near Expiry Inventory' && row.expiryDate1 && new Date(row.expiryDate1) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && new Date(row.expiryDate1) > new Date()) ||
-                        (this.activeTab === 'Expired Inventory' && row.expiryDate1 && new Date(row.expiryDate1) < new Date()) ||
+                        (this.activeTab === 'Near Expiry Inventory' && row.expiryDetails.some(detail => detail.expiryDate && new Date(detail.expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && new Date(detail.expiryDate) > new Date())) ||
+                        (this.activeTab === 'Expired Inventory' && row.expiryDetails.some(detail => detail.expiryDate && new Date(detail.expiryDate) < new Date())) ||
                         (this.activeTab === 'Slow Moving SKU' && row.salesLast15Days == 0);
 
                     const matchesFilters = Object.entries(this.filters).every(([key, value]) => {
@@ -197,13 +250,8 @@ export default {
             filtered = filtered.map(row => {
                 return {
                     ...row,
-                    currentInventory: ['Near Expiry Inventory', 'Expired Inventory'].includes(this.activeTab) ? (row.currentInventory1 ?? 0) :
-                        (row.currentInventory1 ?? 0) +
-                        (row.currentInventory2 ?? 0) +
-                        (row.currentInventory3 ?? 0) +
-                        (row.currentInventory4 ?? 0) +
-                        (row.currentInventory5 ?? 0),
-                    expiryDate: row.expiryDate1 ? `${row.expiryDate1}(${row.currentInventory1})` : ''
+                    currentInventory: row.expiryDetails.reduce((sum, detail) => sum + (detail.count || 0), 0),
+                    expiryDate: row.expiryDetails.map(detail => detail.expiryDate ? `${detail.expiryDate}(${detail.count})` : '').filter(Boolean).join(', ')
                 };
             });
 
@@ -216,39 +264,6 @@ export default {
             }
 
             return filtered;
-        },
-        excelRows() {
-            // Same as before, transform API data
-            const rows = [];
-            this.inventoryData.forEach(item => {
-                if (item.currentInventory && item.currentInventory.length) {
-                    // For each inventory record, create a row.
-                    const row = {
-                        skuCode: item.skuCode,
-                        productTitle: item.productTitle,
-                        sapCode: item.sapCode,
-                        ean: item.ean,
-                        salesLast15Days: item.salesLast15Days
-                    };
-                    item.currentInventory.forEach((inv, i) => {
-                        row[`currentInventory${i + 1}`] = inv.count;
-                        row[`updatedInventory${i + 1}`] = '';
-                        row[`expiryDate${i + 1}`] = inv.expiry ?? '';
-                    });
-                    rows.push(row);
-                } else {
-                    // For SKUs with no inventory, add one row with 0 and a blank row below.
-                    rows.push({
-                        skuCode: item.skuCode,
-                        productTitle: item.productTitle,
-                        sapCode: item.sapCode,
-                        ean: item.ean,
-                        currentInventory1: 0,
-                        salesLast15Days: item.salesLast15Days
-                    });
-                }
-            });
-            return rows;
         },
     },
     methods: {
@@ -554,6 +569,7 @@ td {
     padding: 12px;
     border: 1px solid #eee;
     text-align: left;
+    min-width: 0;
 }
 
 th {
@@ -571,19 +587,12 @@ th {
     gap: 5px;
     align-items: center;
     /* flex-wrap: wrap; */
-    /* min-width: 250px; */
 }
 
 .filter-select {
-    max-width: 150px; /* Adjusted for single dropdown */
+    max-width: 200px;
     min-width: 150px;
     margin: 2px 0;
-    padding-right: 0px
-}
-
-.v-input--density-default .v-field--variant-solo, .v-input--density-default .v-field--variant-solo-inverted, .v-input--density-default .v-field--variant-solo-filled, .v-input--density-default .v-field--variant-filled {
-    --v-input-control-height: 50px;
-    --v-field-padding-bottom: 4px;
 }
 
 .filter-input {
@@ -696,5 +705,10 @@ th {
 
 .v-menu__content {
     z-index: 1000 !important;
+}
+
+td:nth-child(4) { /* Adjust width for expiryDate column */
+    max-width: 220px;
+    word-wrap: break-word;
 }
 </style>
