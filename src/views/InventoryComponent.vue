@@ -109,7 +109,7 @@ export default {
             inventoryData: [],
             searchQuery: '',
             activeTab: 'All Inventory',
-            tabs: ['All Inventory', 'Low Inventory', 'Out of Stock', 'Near Expiry Inventory', 'Expired Inventory', 'Slow Moving SKU'],
+            tabs: ['All Inventory', 'Low Inventory', 'Out of Stock', 'Near Expiry Inventory', 'Expired Inventory', 'Slow Moving SKU', 'Sales Last 15 Days'], // Added Sales Last 15 Days tab
             columns: [
                 { key: 'skuCode', label: 'SKU Code*' },
                 { key: 'productTitle', label: 'Product Title*' },
@@ -140,7 +140,10 @@ export default {
                 { text: 'October', value: '10' },
                 { text: 'November', value: '11' },
                 { text: 'December', value: '12' }
-            ]
+            ],
+            uploadProgress: 0, // To track upload progress
+            uploadMessages: [], // To store real-time upload messages
+            salesLast15DaysData: [] // New data for sales last 15 days
         };
     },
     computed: {
@@ -155,53 +158,64 @@ export default {
         },
         excelRows() {
             const rows = [];
-            this.inventoryData.forEach(item => {
-                if (item.currentInventory && item.currentInventory.length) {
-                const row = {
-                    skuCode: item.skuCode,
-                    productTitle: item.productTitle,
-                    sapCode: item.sapCode,
-                    ean: item.ean,
-                    salesLast15Days: item.salesLast15Days,
-                    expiryDetails: []
-                };
+            if (this.activeTab === 'Sales Last 15 Days' && this.salesLast15DaysData.length > 0) {
+                this.salesLast15DaysData.forEach(item => {
+                    rows.push({
+                        skuCode: item.skuCode,
+                        productTitle: item.productTitle || '', // Fallback if not provided
+                        salesLast15Days: item.salesLast15Days || 0,
+                        expiryDetails: [] // No expiry details for sales data
+                    });
+                });
+            } else {
+                this.inventoryData.forEach(item => {
+                    if (item.currentInventory && item.currentInventory.length) {
+                        const row = {
+                            skuCode: item.skuCode,
+                            productTitle: item.productTitle,
+                            sapCode: item.sapCode,
+                            ean: item.ean,
+                            salesLast15Days: item.salesLast15Days || 0, // Ensure salesLast15Days is present
+                            expiryDetails: []
+                        };
 
-                let totalCount = 0;
-                // Collect all expiry dates and counts
-                for (let i = 1; i <= 5; i++) {
-                    const record = item.currentInventory[i - 1];
-                    if (record) {
-                        totalCount += record.count || 0;
-                        if (record.expiry) {
+                        let totalCount = 0;
+                        // Collect all expiry dates and counts
+                        for (let i = 1; i <= 5; i++) {
+                            const record = item.currentInventory[i - 1];
+                            if (record) {
+                                totalCount += record.count || 0;
+                                if (record.expiry) {
+                                    row.expiryDetails.push({
+                                        expiryDate: record.expiry,
+                                        count: record.count
+                                    });
+                                }
+                            }
+                        }
+
+                        // ✅ If no expiry dates exist, still show total inventory (non-expiry stock)
+                        if (row.expiryDetails.length === 0 && totalCount > 0) {
                             row.expiryDetails.push({
-                                expiryDate: record.expiry,
-                                count: record.count
+                                expiryDate: null,
+                                count: totalCount
                             });
                         }
+
+                        rows.push(row);
+                    } else {
+                        rows.push({
+                            skuCode: item.skuCode,
+                            productTitle: item.productTitle,
+                            sapCode: item.sapCode,
+                            ean: item.ean,
+                            currentInventory1: 0,
+                            salesLast15Days: item.salesLast15Days || 0, // Ensure salesLast15Days is present
+                            expiryDetails: []
+                        });
                     }
-                }
-
-                // ✅ If no expiry dates exist, still show total inventory (non-expiry stock)
-                if (row.expiryDetails.length === 0 && totalCount > 0) {
-                    row.expiryDetails.push({
-                        expiryDate: null,
-                        count: totalCount
-                    });
-                }
-
-                rows.push(row);
-            } else {
-                rows.push({
-                    skuCode: item.skuCode,
-                    productTitle: item.productTitle,
-                    sapCode: item.sapCode,
-                    ean: item.ean,
-                    currentInventory1: 0,
-                    salesLast15Days: item.salesLast15Days,
-                    expiryDetails: []
                 });
             }
-            });
             return rows;
         },
         filteredRows() {
@@ -233,7 +247,8 @@ export default {
                         (this.activeTab === 'Out of Stock' && totalInventory === 0) ||
                         (this.activeTab === 'Near Expiry Inventory' && row.expiryDetails.some(detail => detail.expiryDate && new Date(detail.expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && new Date(detail.expiryDate) > new Date())) ||
                         (this.activeTab === 'Expired Inventory' && row.expiryDetails.some(detail => detail.expiryDate && new Date(detail.expiryDate) < new Date())) ||
-                        (this.activeTab === 'Slow Moving SKU' && row.salesLast15Days == 0);
+                        (this.activeTab === 'Slow Moving SKU' && row.salesLast15Days == 0) ||
+                        (this.activeTab === 'Sales Last 15 Days'); // Use salesLast15DaysData when this tab is active
 
                     const matchesFilters = Object.entries(this.filters).every(([key, value]) => {
                         if (key === 'expiryYearMonth' && !value) return true;
@@ -248,10 +263,25 @@ export default {
             }
 
             filtered = filtered.map(row => {
+                const groupedExpiryDetails = {};
+                row.expiryDetails.forEach(detail => {
+                    if (detail.expiryDate) {
+                        const dateKey = detail.expiryDate;
+                        if (!groupedExpiryDetails[dateKey]) {
+                            groupedExpiryDetails[dateKey] = 0;
+                        }
+                        groupedExpiryDetails[dateKey] += detail.count || 0;
+                    }
+                });
+
+                const expiryDisplay = Object.entries(groupedExpiryDetails)
+                    .map(([date, count]) => `${date}(${count})`)
+                    .join(', ');
+
                 return {
                     ...row,
                     currentInventory: row.expiryDetails.reduce((sum, detail) => sum + (detail.count || 0), 0),
-                    expiryDate: row.expiryDetails.map(detail => detail.expiryDate ? `${detail.expiryDate}(${detail.count})` : '').filter(Boolean).join(', ')
+                    expiryDate: expiryDisplay || ''
                 };
             });
 
@@ -277,96 +307,47 @@ export default {
         },
         async handleFileUpload(event) {
             const file = event.target.files[0];
-            if (!file) return;
+            if (!file) {
+                alert('No file uploaded');
+                return;
+            }
             this.uploadLoading = true;
+            this.uploadMessages = []; // Clear previous messages
+            this.uploadProgress = 0;
+
             try {
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    try {
-                        const buffer = e.target.result;
-                        const workbook = new Workbook();
-                        await workbook.xlsx.load(buffer);
+                const formData = new FormData();
+                formData.append('file', file);
 
-                        const worksheet = workbook.worksheets[0];
-                        const updates = [];
-
-                        // Map column headers
-                        const headerRow = worksheet.getRow(1);
-                        let skuCodeCol, currentInvCols = [], updatedInvCols = [], expiryDateCols = [];
-
-                        headerRow.eachCell((cell, colNumber) => {
-                            const header = cell.value.trim();
-                            if (header === 'SKU Code*') skuCodeCol = colNumber;
-                            if (header.startsWith('Current Inventory')) currentInvCols.push(colNumber);
-                            if (header.startsWith('Updated Inventory')) updatedInvCols.push(colNumber);
-                            if (header.startsWith('Expiry Date')) expiryDateCols.push(colNumber);
-                        });
-
-                        if (!skuCodeCol || updatedInvCols.length === 0) {
-                            throw new Error('Missing required columns in Excel file');
-                        }
-
-                        // Process rows
-                        worksheet.eachRow((row, rowNumber) => {
-                            if (rowNumber === 1) return; // Skip header
-
-                            const skuCode = row.getCell(skuCodeCol).text.trim();
-                            if (!skuCode) return;
-
-                            updatedInvCols.forEach((updatedCol, index) => {
-                                const currentInv = parseFloat(row.getCell(currentInvCols[index]).value) || 0;
-                                const updatedInvCell = row.getCell(updatedCol);
-                                const updatedInv = updatedInvCell?.value !== undefined && updatedInvCell?.value !== null ? parseFloat(updatedInvCell.value)
-                                    : null;
-
-                                if (updatedInv === null || isNaN(updatedInv)) return;
-
-                                if (updatedInv !== currentInv) {
-                                    const expiryDateCell = row.getCell(expiryDateCols[index]);
-                                    const expiryDate = expiryDateCell?.value
-                                        ? expiryDateCell.type === ValueType.Date
-                                            ? expiryDateCell.value.toISOString().split('T')[0]
-                                            : expiryDateCell.text
-                                        : null;
-
-                                    updates.push({
-                                        skuCode,
-                                        updatedInventory: updatedInv,
-                                        expiryDate: expiryDate || null,
-                                    });
-                                }
-                            });
-                        });
-
-                        if (updates.length === 0) {
-                            this.uploadLoading = false;
-                            throw new Error('No valid inventory updates found in file');
-                        }
-
-                        // Send data to backend
-                        const payload = {
-                            updates,
-                            updateTimestamp: (() => {
-                                const date = new Date(this.inventoryUpdateDate);
-                                date.setHours(17, 0, 0, 0); // Set time to 5:00 PM (17:00:00)
-                                return date.toISOString();
-                            })(),
-                        };
-
-                        await axios.post(`${import.meta.env.VITE_BACKEND_URL}/inventory/update`, payload);
-                        this.uploadLoading = false;
-                        await this.fetchInventoryData();
-                        this.showUpdateModal = false;
-                        alert('Inventory updated successfully!');
-                    } catch (error) {
-                        console.error('Error processing file:', error);
-                        alert(`Error: ${error.message}`);
+                const response = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/inventory/update`, formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data'
                     }
-                };
-                reader.readAsArrayBuffer(file);
+                });
+
+                if (response.data.success) {
+                    this.uploadMessages.push({ type: 'success', text: 'Inventory updated successfully!' });
+                    this.uploadLoading = false;
+                    this.fetchInventoryData(); // Refresh inventory data
+                }
             } catch (error) {
-                console.error('File read error:', error);
-                alert('Error reading uploaded file');
+                console.error('File upload error:', error);
+                this.uploadMessages.push({ type: 'error', text: 'Error uploading file' });
+                this.uploadLoading = false;
+            }
+        },
+        async fetchSalesLast15Days() {
+            try {
+                const response = await axios.get(`${import.meta.env.VITE_BACKEND_NODE}/sales-last-15-days`, { // Adjust URL as needed
+                    params: {
+                        vendorCode: this.$route.params.vendorCode // Pass vendor context if required
+                    }
+                });
+                if (response.data && response.data.success) {
+                    this.salesLast15DaysData = response.data.data; // Store sales data
+                }
+            } catch (error) {
+                console.error('Error fetching sales last 15 days:', error);
             }
         },
         // Keep existing methods (fetchInventoryData, downloadExcel)
@@ -376,7 +357,7 @@ export default {
             try {
                 const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/inventory/${vendorCode}`);
                 if (response.data && response.data.success) {
-                    // Assuming the API response returns inventory data in data.inventory
+                    // Assuming the API response returns inventory data in data.inventory with salesLast15Days
                     this.inventoryData = response.data.data.inventory;
                 }
             } catch (error) {
@@ -507,6 +488,16 @@ export default {
     mounted() {
         this.fetchInventoryData();
         this.fetchVendors();
+        if (this.activeTab === 'Sales Last 15 Days') {
+            this.fetchSalesLast15Days(); // Fetch sales data on mount if tab is active
+        }
+    },
+    watch: {
+        activeTab(newTab) {
+            if (newTab === 'Sales Last 15 Days') {
+                this.fetchSalesLast15Days(); // Fetch sales data when tab is switched to
+            }
+        }
     }
 };
 </script>

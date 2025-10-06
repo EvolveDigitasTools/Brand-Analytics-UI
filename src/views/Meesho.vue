@@ -34,7 +34,7 @@
             <td>{{ r.oldQty ?? "-" }}</td>
             <td>{{ r.deducted ?? "-" }}</td>
             <td>{{ r.newQty ?? "-" }}</td>
-            <td>{{ r.error ? r.error : "Updated" }}</td>
+            <td>{{ r.skipped ? `Skipped - ${r.reason}` : r.error ? r.error : "Updated" }}</td>
           </tr>
         </tbody>
       </table>
