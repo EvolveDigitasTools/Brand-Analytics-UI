@@ -109,7 +109,8 @@ export default {
             inventoryData: [],
             searchQuery: '',
             activeTab: 'All Inventory',
-            tabs: ['All Inventory', 'Low Inventory', 'Out of Stock', 'Near Expiry Inventory', 'Expired Inventory', 'Slow Moving SKU', 'Sales Last 15 Days'], // Added Sales Last 15 Days tab
+            // tabs: ['All Inventory', 'Low Inventory', 'Out of Stock', 'Near Expiry Inventory', 'Expired Inventory', 'Slow Moving SKU', 'Sales Last 15 Days'], // Added Sales Last 15 Days tab
+            tabs: ['All Inventory', 'Low Inventory', 'Out of Stock', 'Near Expiry Inventory', 'Expired Inventory', 'Slow Moving SKU'], // Added Sales Last 15 Days tab
             columns: [
                 { key: 'skuCode', label: 'SKU Code*' },
                 { key: 'productTitle', label: 'Product Title*' },
