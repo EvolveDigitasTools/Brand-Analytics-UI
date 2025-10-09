@@ -164,7 +164,6 @@ export default {
                         skuCode: item.skuCode,
                         productTitle: item.productTitle || '', // Fallback if not provided
                         salesLast15Days: item.salesLast15Days || 0,
-                        currentInventory: 0, // Ensure no inventory data
                         expiryDetails: [] // No expiry details for sales data
                     });
                 });
@@ -308,100 +307,32 @@ export default {
         },
         async handleFileUpload(event) {
             const file = event.target.files[0];
-            if (!file) return;
+            if (!file) {
+                alert('No file uploaded');
+                return;
+            }
             this.uploadLoading = true;
+            this.uploadMessages = []; // Clear previous messages
+            this.uploadProgress = 0;
+
             try {
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    try {
-                        const buffer = e.target.result;
-                        const workbook = new Workbook();
-                        await workbook.xlsx.load(buffer);
+                const formData = new FormData();
+                formData.append('file', file);
 
-                        const worksheet = workbook.worksheets[0];
-                        const updates = [];
-
-                        // Map column headers
-                        const headerRow = worksheet.getRow(1);
-                        let skuCodeCol, currentInvCols = [], updatedInvCols = [], expiryDateCols = [];
-
-                        headerRow.eachCell((cell, colNumber) => {
-                            // const header = cell.value.trim();
-                            const header = cell.value ? cell.value.toString().trim() : '';
-                            if (header === 'SKU Code*') skuCodeCol = colNumber;
-                            if (header.startsWith('Current Inventory')) currentInvCols.push(colNumber);
-                            if (header.startsWith('Updated Inventory')) updatedInvCols.push(colNumber);
-                            if (header.startsWith('Expiry Date')) expiryDateCols.push(colNumber);
-                        });
-
-                        if (!skuCodeCol || updatedInvCols.length === 0) {
-                            throw new Error('Missing required columns in Excel file');
-                        }
-
-                        // Process rows
-                        worksheet.eachRow((row, rowNumber) => {
-                            if (rowNumber === 1) return; // Skip header
-
-                            const skuCode = row.getCell(skuCodeCol).text.trim();
-                            if (!skuCode) return;
-
-                            updatedInvCols.forEach((updatedCol, index) => {
-                                // const currentInv = parseFloat(row.getCell(currentInvCols[index]).value) || 0;
-                                const updatedInvCell = row.getCell(updatedCol);
-                                const updatedInv = updatedInvCell?.value !== undefined && updatedInvCell?.value !== null 
-                                    ? parseFloat(updatedInvCell.value)
-                                    : null;
-
-                                // if (updatedInv === null || isNaN(updatedInv)) return;
-
-                                // if (updatedInv !== currentInv) {
-                                if (updatedInv !== null && !isNaN(updatedInv)) {
-                                    const expiryDateCell = row.getCell(expiryDateCols[index]);
-                                    const expiryDate = expiryDateCell?.value
-                                        ? expiryDateCell.type === ValueType.Date
-                                            ? expiryDateCell.value.toISOString().split('T')[0]
-                                            : expiryDateCell.text
-                                        : null;
-
-                                    updates.push({
-                                        skuCode,
-                                        updatedInventory: updatedInv,
-                                        expiryDate: expiryDate || null,
-                                    });
-                                }
-                            });
-                        });
-
-                        if (updates.length === 0) {
-                            this.uploadLoading = false;
-                            throw new Error('No valid inventory updates found in file');
-                        }
-
-                        // Send data to backend
-                        const payload = {
-                            updates,
-                            updateTimestamp: (() => {
-                                const date = new Date(this.inventoryUpdateDate);
-                                date.setHours(17, 0, 0, 0); // Set time to 5:00 PM (17:00:00)
-                                return date.toISOString();
-                            })(),
-                        };
-
-                        await axios.post(`${import.meta.env.VITE_BACKEND_URL}/inventory/update`, payload);
-                        this.uploadLoading = false;
-                        await this.fetchInventoryData();
-                        this.showUpdateModal = false;
-                        alert('Inventory updated successfully!');
-                    } catch (error) {
-                        console.error('Error processing file:', error);
-                        alert(`Error: ${error.message}`);
-                        this.uploadLoading = false;
+                const response = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/inventory/update`, formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data'
                     }
-                };
-                reader.readAsArrayBuffer(file);
+                });
+
+                if (response.data.success) {
+                    this.uploadMessages.push({ type: 'success', text: 'Inventory updated successfully!' });
+                    this.uploadLoading = false;
+                    this.fetchInventoryData(); // Refresh inventory data
+                }
             } catch (error) {
-                console.error('File read error:', error);
-                alert('Error reading uploaded file');
+                console.error('File upload error:', error);
+                this.uploadMessages.push({ type: 'error', text: 'Error uploading file' });
                 this.uploadLoading = false;
             }
         },
@@ -464,37 +395,28 @@ export default {
             const workbook = new Workbook();
             const worksheet = workbook.addWorksheet('Inventory');
 
-            // Define headers for up to 5 slots
+            // Define the headers.
             const headers = [
                 { header: 'SKU Code*', key: 'skuCode', width: 15 },
                 { header: 'Product Title*', key: 'productTitle', width: 30 },
                 { header: 'SAP Code', key: 'sapCode', width: 15 },
                 { header: 'EAN', key: 'ean', width: 15 },
-                // { header: 'Current Inventory 1', key: 'currentInventory1', width: 18 },
-                // { header: 'Updated Inventory 1', key: 'updatedInventory1', width: 18 },
-                // { header: 'Expiry Date 1 (yyyy-mm-dd)', key: 'expiryDate1', width: 15 },
-                // { header: 'Current Inventory 2', key: 'currentInventory2', width: 18 },
-                // { header: 'Updated Inventory 2', key: 'updatedInventory2', width: 18 },
-                // { header: 'Expiry Date 2 (yyyy-mm-dd)', key: 'expiryDate2', width: 15 },
-                // { header: 'Current Inventory 3', key: 'currentInventory3', width: 18 },
-                // { header: 'Updated Inventory 3', key: 'updatedInventory3', width: 18 },
-                // { header: 'Expiry Date 3 (yyyy-mm-dd)', key: 'expiryDate3', width: 15 },
-                // { header: 'Current Inventory 4', key: 'currentInventory4', width: 18 },
-                // { header: 'Updated Inventory 4', key: 'updatedInventory4', width: 18 },
-                // { header: 'Expiry Date 4 (yyyy-mm-dd)', key: 'expiryDate4', width: 15 },
-                // { header: 'Current Inventory 5', key: 'currentInventory5', width: 18 },
-                // { header: 'Updated Inventory 5', key: 'updatedInventory5', width: 18 },
-                // { header: 'Expiry Date 5 (yyyy-mm-dd)', key: 'expiryDate5', width: 15 }
+                { header: 'Current Inventory 1', key: 'currentInventory1', width: 18 },
+                { header: 'Updated Inventory 1', key: 'updatedInventory1', width: 18 },
+                { header: 'Expiry Date 1 (yyyy-mm-dd)', key: 'expiryDate1', width: 15 },
+                { header: 'Current Inventory 2', key: 'currentInventory2', width: 18 },
+                { header: 'Updated Inventory 2', key: 'updatedInventory2', width: 18 },
+                { header: 'Expiry Date 2 (yyyy-mm-dd)', key: 'expiryDate2', width: 15 },
+                { header: 'Current Inventory 3', key: 'currentInventory3', width: 18 },
+                { header: 'Updated Inventory 3', key: 'updatedInventory3', width: 18 },
+                { header: 'Expiry Date 3 (yyyy-mm-dd)', key: 'expiryDate3', width: 15 },
+                { header: 'Current Inventory 4', key: 'currentInventory4', width: 18 },
+                { header: 'Updated Inventory 4', key: 'updatedInventory4', width: 18 },
+                { header: 'Expiry Date 4 (yyyy-mm-dd)', key: 'expiryDate4', width: 15 },
+                { header: 'Current Inventory 5', key: 'currentInventory5', width: 18 },
+                { header: 'Updated Inventory 5', key: 'updatedInventory5', width: 18 },
+                { header: 'Expiry Date 5 (yyyy-mm-dd)', key: 'expiryDate5', width: 15 }
             ];
-
-            for (let i = 1; i <= 5; i++) {
-                headers.push(
-                    { header: `Current Inventory ${i}`, key: `currentInventory${i}`, width: 18 },
-                    { header: `Updated Inventory ${i}`, key: `updatedInventory${i}`, width: 18 },
-                    { header: `Expiry Date ${i} (yyyy-mm-dd)`, key: `expiryDate${i}`, width: 15 }
-                );
-            }
-
             worksheet.columns = headers;
 
             // Freeze the first row and first column
@@ -520,41 +442,18 @@ export default {
                 };
             });
 
-            // Add rows with slot-based data
+            // Add rows to the worksheet.
             this.excelRows.forEach(row => {
-                const excelRow = {
-                    skuCode: row.skuCode,
-                    productTitle: row.productTitle,
-                    sapCode: row.sapCode || '',
-                    ean: row.ean || ''
-                };
+                const addedRow = worksheet.addRow(row);
 
-                // Populate up to 5 slots
-                row.expiryDetails.forEach((detail, index) => {
-                    if (index < 5) {
-                        excelRow[`currentInventory${index + 1}`] = detail.count || 0;
-                        excelRow[`updatedInventory${index + 1}`] = ''; // Empty for user input
-                        excelRow[`expiryDate${index + 1}`] = detail.expiryDate || '';
-                    }
-                });
-
-                // Fill remaining slots with empty values
-                for (let i = row.expiryDetails.length + 1; i <= 5; i++) {
-                    excelRow[`currentInventory${i}`] = '';
-                    excelRow[`updatedInventory${i}`] = '';
-                    excelRow[`expiryDate${i}`] = '';
-                }
-
-                const addedRow = worksheet.addRow(excelRow);
-
-                // Apply styling to Updated Inventory columns
+                // Apply color styling to "Updated Inventory" columns
                 headers.forEach((header, index) => {
                     if (header.key && header.key.startsWith('updatedInventory')) {
-                        const cell = addedRow.getCell(index + 1);
+                        const cell = addedRow.getCell(index + 1); // Get the cell for the current column
                         cell.fill = {
                             type: 'pattern',
                             pattern: 'solid',
-                            fgColor: { argb: 'FFCCE5FF' }
+                            fgColor: { argb: 'FFCCE5FF' } // Light blue background for updated inventory
                         };
                         cell.border = {
                             top: { style: 'thin', color: { argb: 'FF000000' } },
@@ -566,6 +465,7 @@ export default {
                 });
             });
 
+            // Generate the excel file as a Blob and trigger the download.
             try {
                 const buffer = await workbook.xlsx.writeBuffer();
                 const blob = new Blob([buffer], { type: 'application/octet-stream' });
@@ -573,11 +473,12 @@ export default {
                 const link = document.createElement('a');
                 link.href = url;
                 link.download = 'inventory.xlsx';
+                document.body.appendChild(link);
                 link.click();
+                document.body.removeChild(link);
                 window.URL.revokeObjectURL(url);
             } catch (error) {
-                console.error('Error generating Excel file:', error);
-                alert('Error generating Excel file');
+                console.error('Error generating excel file:', error);
             }
         },
         onExpiryFilterChange() {
@@ -588,13 +489,13 @@ export default {
         this.fetchInventoryData();
         this.fetchVendors();
         if (this.activeTab === 'Sales Last 15 Days') {
-            this.fetchSalesLast15Days();
+            this.fetchSalesLast15Days(); // Fetch sales data on mount if tab is active
         }
     },
     watch: {
         activeTab(newTab) {
             if (newTab === 'Sales Last 15 Days') {
-                this.fetchSalesLast15Days();
+                this.fetchSalesLast15Days(); // Fetch sales data when tab is switched to
             }
         }
     }
