@@ -65,11 +65,6 @@
                         <td>{{ row.skuCode }}</td>
                         <td>{{ row.productTitle }}</td>
                         <td>{{ row.currentInventory }}</td>
-                        <!-- <td>
-                            <span v-for="(detail, index) in row.expiryDetails" :key="index">
-                                {{ detail.expiryDate }}({{ detail.count }}){{ index < row.expiryDetails.length - 1 ? ', ' : '' }}
-                            </span>
-                        </td> -->
                         <td>
                         <template v-for="(detail, index) in row.expiryDetails" :key="index">
                             <span>
@@ -229,21 +224,33 @@ export default {
             return rows;
         },
         filteredRows() {
-            let filtered = this.excelRows;
+        let filtered = this.excelRows;
 
-            // If expiryYearMonth is set, filter strictly by that year-month across all expiry dates
-            if (this.filters.expiryYearMonth) {
-                const [filterYear, filterMonth] = this.filters.expiryYearMonth.split('-');
-                filtered = filtered.filter(row => {
-                    return row.expiryDetails.some(detail => {
+        // If expiryYearMonth is set, filter strictly by that year-month across all expiry dates
+        if (this.filters.expiryYearMonth) {
+            const [filterYear, filterMonth] = this.filters.expiryYearMonth.split('-');
+
+            filtered = filtered
+                .map(row => {
+                    // Keep only expiryDetails matching selected year-month
+                    const matchedExpiryDetails = row.expiryDetails.filter(detail => {
                         if (!detail.expiryDate) return false;
                         const date = new Date(detail.expiryDate);
                         const rowYear = date.getFullYear().toString();
                         const rowMonth = (date.getMonth() + 1).toString().padStart(2, '0');
                         return rowYear === filterYear && rowMonth === filterMonth;
                     });
-                });
-            } else {
+
+                    // If no matching expiryDetails, exclude the row entirely
+                    if (matchedExpiryDetails.length === 0) return null;
+
+                    return {
+                        ...row,
+                        expiryDetails: matchedExpiryDetails
+                    };
+                })
+                .filter(Boolean);
+        } else {
                 // Apply other filters only when no year-month is selected
                 filtered = filtered.filter(row => {
                     const matchesSearch = this.searchQuery.toLowerCase().split(' ').every(term =>
@@ -252,20 +259,36 @@ export default {
                     );
 
                     const totalInventory = row.expiryDetails.reduce((sum, detail) => sum + (detail.count || 0), 0);
+
                     const matchesTab = this.activeTab === 'All Inventory' ||
                         (this.activeTab === 'Low Inventory' && totalInventory < 50 && totalInventory > 0) ||
                         (this.activeTab === 'Out of Stock' && totalInventory === 0) ||
-                        (this.activeTab === 'Near Expiry Inventory' && row.expiryDetails.some(detail => detail.expiryDate && new Date(detail.expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && new Date(detail.expiryDate) > new Date())) ||
-                        (this.activeTab === 'Expired Inventory' && row.expiryDetails.some(detail => detail.expiryDate && new Date(detail.expiryDate) < new Date())) ||
+                        (this.activeTab === 'Near Expiry Inventory' && 
+                            row.expiryDetails.some(detail => 
+                                detail.expiryDate && 
+                                new Date(detail.expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && 
+                                new Date(detail.expiryDate) > new Date()
+                            )
+                        ) ||
+                        (this.activeTab === 'Expired Inventory' && 
+                            row.expiryDetails.some(detail => detail.expiryDate && 
+                            new Date(detail.expiryDate) < new Date()
+                            )
+                        ) ||
                         (this.activeTab === 'Slow Moving SKU' && row.salesLast15Days == 0) ||
                         (this.activeTab === 'Sales Last 15 Days'); // Use salesLast15DaysData when this tab is active
 
                     const matchesFilters = Object.entries(this.filters).every(([key, value]) => {
-                        if (key === 'expiryYearMonth' && !value) return true;
-                        if (key !== 'expiryYearMonth') {
-                            return !value || String(row[key]).toLowerCase().includes(value.toLowerCase());
+                        if (!value) return true;
+
+                        if (key === 'expiryYearMonth') return true;
+
+                        if (key === 'currentInventory') {
+                            const totalInventory = row.expiryDetails.reduce((sum, detail) => sum + (detail.count || 0), 0);
+                            return totalInventory.toString().includes(value.toString());
                         }
-                        return true;
+
+                        return String(row[key] || '').toLowerCase().includes(String(value).toLowerCase());
                     });
 
                     return matchesSearch && matchesTab && matchesFilters;
