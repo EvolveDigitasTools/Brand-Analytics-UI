@@ -307,105 +307,221 @@ export default {
                 this.sortConfig.asc = true;
             }
         },
-        async handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            this.uploadLoading = true;
-            try {
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    try {
-                        const buffer = e.target.result;
-                        const workbook = new Workbook();
-                        await workbook.xlsx.load(buffer);
 
-                        const worksheet = workbook.worksheets[0];
-                        const updates = [];
+// async handleFileUpload(event) {
+//   const file = event.target.files[0];
+//   if (!file) return;
+//   this.uploadLoading = true;
 
-                        // Map column headers
-                        const headerRow = worksheet.getRow(1);
-                        let skuCodeCol, currentInvCols = [], updatedInvCols = [], expiryDateCols = [];
+//   try {
+//     const reader = new FileReader();
+//     reader.onload = async (e) => {
+//       try {
+//         const buffer = e.target.result;
+//         const workbook = new Workbook();
+//         await workbook.xlsx.load(buffer);
 
-                        headerRow.eachCell((cell, colNumber) => {
-                            // const header = cell.value.trim();
-                            const header = cell.value ? cell.value.toString().trim() : '';
-                            if (header === 'SKU Code*') skuCodeCol = colNumber;
-                            if (header.startsWith('Current Inventory')) currentInvCols.push(colNumber);
-                            if (header.startsWith('Updated Inventory')) updatedInvCols.push(colNumber);
-                            if (header.startsWith('Expiry Date')) expiryDateCols.push(colNumber);
-                        });
+//         const worksheet = workbook.worksheets[0];
+//         const updates = [];
 
-                        if (!skuCodeCol || updatedInvCols.length === 0) {
-                            throw new Error('Missing required columns in Excel file');
-                        }
+//         // Map column headers
+//         const headerRow = worksheet.getRow(1);
+//         let skuCodeCol, updatedInvCols = [], expiryCols = [];
 
-                        // Process rows
-                        worksheet.eachRow((row, rowNumber) => {
-                            if (rowNumber === 1) return; // Skip header
+//         headerRow.eachCell((cell, colNumber) => {
+//           const header = cell.value ? cell.value.toString().trim() : '';
+//           if (header === 'SKU Code*') skuCodeCol = colNumber;
+//           if (header.startsWith('Updated Inventory')) updatedInvCols.push(colNumber);
+//           if (header.startsWith('Expiry Date')) expiryCols.push(colNumber);
+//         });
 
-                            const skuCode = row.getCell(skuCodeCol).text.trim();
-                            if (!skuCode) return;
+//         if (!skuCodeCol || updatedInvCols.length === 0) {
+//           throw new Error('Missing required columns in Excel file');
+//         }
 
-                            updatedInvCols.forEach((updatedCol, index) => {
-                                // const currentInv = parseFloat(row.getCell(currentInvCols[index]).value) || 0;
-                                const updatedInvCell = row.getCell(updatedCol);
-                                const updatedInv = updatedInvCell?.value !== undefined && updatedInvCell?.value !== null 
-                                    ? parseFloat(updatedInvCell.value)
-                                    : null;
+//         worksheet.eachRow((row, rowNumber) => {
+//           if (rowNumber === 1) return; // skip header
 
-                                // if (updatedInv === null || isNaN(updatedInv)) return;
+//           const skuCode = row.getCell(skuCodeCol).text.trim();
+//           if (!skuCode) return;
 
-                                // if (updatedInv !== currentInv) {
-                                if (updatedInv !== null && !isNaN(updatedInv)) {
-                                    const expiryDateCell = row.getCell(expiryDateCols[index]);
-                                    const expiryDate = expiryDateCell?.value
-                                        ? expiryDateCell.type === ValueType.Date
-                                            ? expiryDateCell.value.toISOString().split('T')[0]
-                                            : expiryDateCell.text
-                                        : null;
+//           const slotUpdates = [];
 
-                                    updates.push({
-                                        skuCode,
-                                        updatedInventory: updatedInv,
-                                        expiryDate: expiryDate || null,
-                                    });
-                                }
-                            });
-                        });
+//           updatedInvCols.forEach((col, index) => {
+//             const updatedInvCell = row.getCell(col);
+//             const updatedQty = updatedInvCell?.value != null ? parseFloat(updatedInvCell.value) : null;
 
-                        if (updates.length === 0) {
-                            this.uploadLoading = false;
-                            throw new Error('No valid inventory updates found in file');
-                        }
+//             const expiryCell = row.getCell(expiryCols[index]);
+//             let expiryDate = null;
 
-                        // Send data to backend
-                        const payload = {
-                            updates,
-                            updateTimestamp: (() => {
-                                const date = new Date(this.inventoryUpdateDate);
-                                date.setHours(17, 0, 0, 0); // Set time to 5:00 PM (17:00:00)
-                                return date.toISOString();
-                            })(),
-                        };
+//             if (expiryCell?.value) {
+//               if (expiryCell.type === ValueType.Date) {
+//                 expiryDate = expiryCell.value.toISOString().slice(0, 10); // YYYY-MM-DD
+//               } else {
+//                 // try to parse string value
+//                 const parsed = new Date(expiryCell.text);
+//                 if (!isNaN(parsed)) expiryDate = parsed.toISOString().slice(0, 10);
+//               }
+//             }
 
-                        await axios.post(`${import.meta.env.VITE_BACKEND_URL}/inventory/update`, payload);
-                        this.uploadLoading = false;
-                        await this.fetchInventoryData();
-                        this.showUpdateModal = false;
-                        alert('Inventory updated successfully!');
-                    } catch (error) {
-                        console.error('Error processing file:', error);
-                        alert(`Error: ${error.message}`);
-                        this.uploadLoading = false;
-                    }
-                };
-                reader.readAsArrayBuffer(file);
-            } catch (error) {
-                console.error('File read error:', error);
-                alert('Error reading uploaded file');
-                this.uploadLoading = false;
+//             // Only push if at least updatedQty or expiry exists
+//             if (updatedQty != null || expiryDate != null) {
+//               slotUpdates.push({
+//                 updatedInventory: updatedQty,
+//                 expiryDate: expiryDate
+//               });
+//             } else {
+//               slotUpdates.push(null); // maintain slot position
+//             }
+//           });
+
+//           updates.push({ skuCode, slotUpdates });
+//         });
+
+//         if (updates.length === 0) {
+//           this.uploadLoading = false;
+//           throw new Error('No valid inventory updates found in file');
+//         }
+
+//         const payload = {
+//           updates,
+//           updateTimestamp: (() => {
+//             const date = new Date(this.inventoryUpdateDate);
+//             date.setHours(17, 0, 0, 0); // 5:00 PM
+//             return date.toISOString();
+//           })(),
+//         };
+
+//         await axios.post(`${import.meta.env.VITE_BACKEND_NODE}/api/inventory/update-all-slots`, payload);
+
+//         this.uploadLoading = false;
+//         await this.fetchInventoryData();
+//         this.showUpdateModal = false;
+//         alert('Inventory updated successfully!');
+//       } catch (err) {
+//         console.error('Error processing file:', err);
+//         alert(`Error: ${err.message}`);
+//         this.uploadLoading = false;
+//       }
+//     };
+
+//     reader.readAsArrayBuffer(file);
+
+//   } catch (err) {
+//     console.error('File read error:', err);
+//     alert('Error reading uploaded file');
+//     this.uploadLoading = false;
+//   }
+// },
+
+
+async handleFileUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  this.uploadLoading = true;
+
+  try {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const buffer = e.target.result;
+        const workbook = new Workbook();
+        await workbook.xlsx.load(buffer);
+
+        const worksheet = workbook.worksheets[0];
+        const updates = [];
+
+        // Map column headers
+        const headerRow = worksheet.getRow(1);
+        let skuCodeCol, updatedInvCols = [], expiryCols = [];
+
+        headerRow.eachCell((cell, colNumber) => {
+          const header = cell.value ? cell.value.toString().trim() : '';
+          if (header === 'SKU Code*') skuCodeCol = colNumber;
+          if (header.startsWith('Updated Inventory')) updatedInvCols.push(colNumber);
+          if (header.startsWith('Expiry Date')) expiryCols.push(colNumber);
+        });
+
+        if (!skuCodeCol || updatedInvCols.length === 0) {
+          throw new Error('Missing required columns in Excel file');
+        }
+
+        worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return; // skip header
+
+        const skuCode = row.getCell(skuCodeCol).text.trim();
+        if (!skuCode) return;
+
+        const slotUpdates = [];
+
+        updatedInvCols.forEach((col, index) => {
+            const updatedInvCell = row.getCell(col);
+            const expiryCell = row.getCell(expiryCols[index]);
+
+            let updatedQty = null;
+            let expiryDate = null;
+
+            // Updated Inventory
+            if (updatedInvCell?.value != null && updatedInvCell.value !== '') {
+            updatedQty = parseFloat(updatedInvCell.value);
+            } else {
+            updatedQty = 0; // treat blank as 0
             }
-        },
+
+            // Expiry Date
+            if (expiryCell?.value) {
+            if (expiryCell.type === ValueType.Date) {
+                expiryDate = expiryCell.value.toISOString().slice(0, 10);
+            } else {
+                const parsed = new Date(expiryCell.text);
+                if (!isNaN(parsed)) expiryDate = parsed.toISOString().slice(0, 10);
+            }
+            } else {
+            expiryDate = null; // treat blank as null
+            }
+
+            slotUpdates.push({ updatedInventory: updatedQty, expiryDate });
+        });
+
+        updates.push({ skuCode, slotUpdates });
+        });
+
+        if (updates.length === 0) {
+          this.uploadLoading = false;
+          throw new Error('No valid inventory updates found in file');
+        }
+
+        const payload = {
+          updates,
+          updateTimestamp: (() => {
+            const date = new Date(this.inventoryUpdateDate);
+            date.setHours(17, 0, 0, 0); // 5:00 PM
+            return date.toISOString();
+          })(),
+        };
+
+        await axios.post(`${import.meta.env.VITE_BACKEND_NODE}/api/inventory/update-all-slots`, payload);
+
+        this.uploadLoading = false;
+        await this.fetchInventoryData();
+        this.showUpdateModal = false;
+        alert('Inventory updated successfully!');
+      } catch (err) {
+        console.error('Error processing file:', err);
+        alert(`Error: ${err.message}`);
+        this.uploadLoading = false;
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+
+  } catch (err) {
+    console.error('File read error:', err);
+    alert('Error reading uploaded file');
+    this.uploadLoading = false;
+  }
+},
+
         async fetchSalesLast15Days() {
             try {
                 const response = await axios.get(`${import.meta.env.VITE_BACKEND_NODE}/sales-last-15-days`, { // Adjust URL as needed

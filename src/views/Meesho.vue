@@ -18,7 +18,7 @@
             <th>#</th>
             <th>SKU Code</th>
             <!-- <th>Reason</th> -->
-            <!-- <th>Child SKU</th> -->
+            <th>Child SKU</th>
             <th>Old Qty</th>
             <th>Deducted</th>
             <th>New Qty</th>
@@ -28,9 +28,9 @@
         <tbody>
           <tr v-for="(r, index) in results" :key="r.uploadedSku + '_' + index">
             <td>{{ index + 1 }}</td>
-            <td>{{ r.uploadedSku || r.comboSku || r.skuCode || "-" }}</td>
+            <td>{{ r.uploadedSku || r.comboSku || r.groupSku || r.skuCode || "-" }}</td>
             <!-- <td>{{ r.reason ?? "-" }}</td> -->
-            <!-- <td>{{ r.childSku ? r.childSku : (r.type === "normal" ? "-" : "") }}</td> -->
+            <td>{{ r.childSku ? r.childSku : (r.type === "normal-with-group" ? "-" : "") }}</td>
             <td>{{ r.oldQty ?? "-" }}</td>
             <td>{{ r.deducted ?? "-" }}</td>
             <td>{{ r.newQty ?? "-" }}</td>

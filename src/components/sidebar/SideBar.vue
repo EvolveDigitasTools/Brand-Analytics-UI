@@ -32,5 +32,6 @@ const menuItems = ref([
     // { title: 'Update Daily Orders', route: '/dashboard/update-daily-orders', icon: 'mdi-package-up' },//Backup   
     // { title: 'SKU Mapping', route: '/dashboard/sku-mapping', icon: 'mdi-package-variant' },
     { title: 'SKU Mapping', route: '/dashboard/combo-sku', icon: 'mdi-package-variant' }, // H
+    { title: 'Group SKU Mapping', route: '/dashboard/group-sku', icon: 'mdi-package-variant' }, // H
 ])
 </script>
