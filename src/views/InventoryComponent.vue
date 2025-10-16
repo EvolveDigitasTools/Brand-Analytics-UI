@@ -75,7 +75,7 @@
                             </span>
                             <br v-if="index < row.expiryDetails.length - 1">
                         </template>
-                        </td>
+                        </td>                      
                         <td>{{ row.lowShelf }}</td>                        
                         <td>{{ row.salesLast15Days }}</td>
                     </tr>
@@ -118,7 +118,7 @@ export default {
             searchQuery: '',
             activeTab: 'All Inventory',
             // tabs: ['All Inventory', 'Low Inventory', 'Out of Stock', 'Near Expiry Inventory', 'Expired Inventory', 'Slow Moving SKU', 'Sales Last 15 Days'], // Added Sales Last 15 Days tab
-            tabs: ['All Inventory', 'Low Inventory', 'Out of Stock', 'Near Expiry Inventory', 'Expired Inventory', 'Slow Moving SKU', 'Low Shelf', 'Sales Last 15 Days'], // Added Sales Last 15 Days tab
+            tabs: ['All Inventory', 'Low Inventory', 'Out of Stock', 'Near Expiry Inventory', 'Expired Inventory', 'Slow Moving SKU'], // Added Sales Last 15 Days tab
             columns: [
                 { key: 'skuCode', label: 'SKU Code*' },
                 { key: 'productTitle', label: 'Product Title*' },
@@ -198,9 +198,16 @@ export default {
             }
             else {
                 const lowShelfMap = this.lowShelfData.reduce((map, item) => {
-                    map[item.skuCode] = item.expiryProgress || 0;
+                    if (item.expiryDetails && item.expiryDetails.length > 0) {
+                        map[item.skuCode] = item.expiryDetails
+                            .map(d => d.expiryProgress || 0).join('%, ');
+                    } else {
+                        map[item.skuCode] = '0%';
+                    }
                     return map;
                 }, {});
+
+
                 this.inventoryData.forEach(item => {
                     if (item.currentInventory && item.currentInventory.length) {
                         const row = {
@@ -734,9 +741,6 @@ export default {
 };
 </script>
 
-
-
-
 <style scoped>
 .inventory-container {
     padding: 20px;
@@ -936,5 +940,10 @@ th {
 td:nth-child(4) { /* Adjust width for expiryDate column */
     max-width: 220px;
     word-wrap: break-word;
+}
+
+td:nth-child(5) {
+    display: table-caption;
+    border: none;
 }
 </style>
