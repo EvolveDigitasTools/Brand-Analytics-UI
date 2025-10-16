@@ -189,7 +189,8 @@ export default {
                         currentInventory: item.currentInventory || 0,
                         expiryDetails: item.expiryDate ? [{
                             expiryDate: item.expiryDate, // ✅ already formatted (YYYY-MM-DD) from backend
-                            count: item.currentInventory || 0
+                            count: item.currentInventory || 0,
+                            expiryProgress: item.expiryProgress || 0
                         }] : [],
                         lowShelf: item.expiryProgress || 0,
                         salesLast15Days: item.salesLast15Days || 0,
@@ -281,9 +282,19 @@ export default {
                     // If no matching expiryDetails, exclude the row entirely
                     if (matchedExpiryDetails.length === 0) return null;
 
+                    // Calculate Low Shelf % only from matched expiryDetails
+                    const lowShelfValue = matchedExpiryDetails
+                        .map(d => {
+                            // Ensure d.expiryProgress exists
+                            return (d.expiryProgress != null ? d.expiryProgress : 0) + '%';
+                        })
+                        .join('\n'); // vertical display
+
                     return {
                         ...row,
-                        expiryDetails: matchedExpiryDetails
+                        expiryDetails: matchedExpiryDetails,
+                        currentInventory: matchedExpiryDetails.reduce((sum, d) => sum + (d.currentInventory || 0), 0),
+                        lowShelf: lowShelfValue || '0%'
                     };
                 })
                 .filter(Boolean);
@@ -943,7 +954,7 @@ td:nth-child(4) { /* Adjust width for expiryDate column */
 }
 
 td:nth-child(5) {
-    display: table-caption;
-    border: none;
+   white-space: break-spaces;
+    word-break: break-word;
 }
 </style>
