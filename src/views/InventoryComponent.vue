@@ -51,6 +51,9 @@
                                             ></v-select>
                                         </div>
                                     </template>
+                                    <template v-else-if="column.key === 'lowShelf'">
+                                        <input v-model="filters.lowShelf" @input="onFilterChange" class="filter-input" />
+                                    </template>
                                     <input v-else v-model="filters[column.key]" @click.stop class="filter-input" />
                                     <button @click="toggleSort(column.key)" class="sort-btn">
                                         {{ sortConfig.key === column.key ? (sortConfig.asc ? '↑' : '↓') : '⇅' }}
@@ -73,6 +76,7 @@
                             <br v-if="index < row.expiryDetails.length - 1">
                         </template>
                         </td>
+                        <td>{{ row.lowShelf }}</td>                        
                         <td>{{ row.salesLast15Days }}</td>
                     </tr>
                 </tbody>
@@ -110,19 +114,22 @@ export default {
     data() {
         return {
             inventoryData: [],
+            lowShelfData: [],
             searchQuery: '',
             activeTab: 'All Inventory',
             // tabs: ['All Inventory', 'Low Inventory', 'Out of Stock', 'Near Expiry Inventory', 'Expired Inventory', 'Slow Moving SKU', 'Sales Last 15 Days'], // Added Sales Last 15 Days tab
-            tabs: ['All Inventory', 'Low Inventory', 'Out of Stock', 'Near Expiry Inventory', 'Expired Inventory', 'Slow Moving SKU'], // Added Sales Last 15 Days tab
+            tabs: ['All Inventory', 'Low Inventory', 'Out of Stock', 'Near Expiry Inventory', 'Expired Inventory', 'Slow Moving SKU', 'Low Shelf', 'Sales Last 15 Days'], // Added Sales Last 15 Days tab
             columns: [
                 { key: 'skuCode', label: 'SKU Code*' },
                 { key: 'productTitle', label: 'Product Title*' },
                 { key: 'currentInventory', label: 'Current Inventory' },
                 { key: 'expiryDate', label: 'Expiry Date' },
+                { key: 'lowShelf', label: 'Low Shelf (%)' },
                 { key: 'salesLast15Days', label: 'Sales Last 15 Days' }
             ],
             filters: {
-                expiryYearMonth: null
+                expiryYearMonth: null,
+                lowShelf: ''
             },
             sortConfig: { key: null, asc: true },
             showUpdateModal: false,
@@ -162,17 +169,38 @@ export default {
         },
         excelRows() {
             const rows = [];
+
             if (this.activeTab === 'Sales Last 15 Days' && this.salesLast15DaysData.length > 0) {
                 this.salesLast15DaysData.forEach(item => {
                     rows.push({
                         skuCode: item.skuCode,
-                        productTitle: item.productTitle || '', // Fallback if not provided
+                        productTitle: item.productTitle || '',
                         salesLast15Days: item.salesLast15Days || 0,
-                        currentInventory: 0, // Ensure no inventory data
-                        expiryDetails: [] // No expiry details for sales data
+                        currentInventory: 0, 
+                        expiryDetails: [],
+                        lowShelf: item.lowShelf || 0
                     });
                 });
-            } else {
+            } else if (this.activeTab === 'Low Shelf' && this.lowShelfData.length > 0) {
+                this.lowShelfData.forEach(item => {
+                    rows.push({
+                        skuCode: item.skuCode,
+                        productTitle: item.productTitle,
+                        currentInventory: item.currentInventory || 0,
+                        expiryDetails: item.expiryDate ? [{
+                            expiryDate: item.expiryDate, // ✅ already formatted (YYYY-MM-DD) from backend
+                            count: item.currentInventory || 0
+                        }] : [],
+                        lowShelf: item.expiryProgress || 0,
+                        salesLast15Days: item.salesLast15Days || 0,
+                    });
+                });
+            }
+            else {
+                const lowShelfMap = this.lowShelfData.reduce((map, item) => {
+                    map[item.skuCode] = item.expiryProgress || 0;
+                    return map;
+                }, {});
                 this.inventoryData.forEach(item => {
                     if (item.currentInventory && item.currentInventory.length) {
                         const row = {
@@ -180,8 +208,9 @@ export default {
                             productTitle: item.productTitle,
                             sapCode: item.sapCode,
                             ean: item.ean,
-                            salesLast15Days: item.salesLast15Days || 0, // Ensure salesLast15Days is present
-                            expiryDetails: []
+                            salesLast15Days: item.salesLast15Days || 0,
+                            expiryDetails: [],
+                            lowShelf: lowShelfMap[item.skuCode] || 0
                         };
 
                         let totalCount = 0;
@@ -215,8 +244,9 @@ export default {
                             sapCode: item.sapCode,
                             ean: item.ean,
                             currentInventory1: 0,
-                            salesLast15Days: item.salesLast15Days || 0, // Ensure salesLast15Days is present
-                            expiryDetails: []
+                            salesLast15Days: item.salesLast15Days || 0,
+                            expiryDetails: [],
+                            lowShelf: lowShelfMap[item.skuCode] || 0
                         });
                     }
                 });
@@ -276,7 +306,8 @@ export default {
                             )
                         ) ||
                         (this.activeTab === 'Slow Moving SKU' && row.salesLast15Days == 0) ||
-                        (this.activeTab === 'Sales Last 15 Days'); // Use salesLast15DaysData when this tab is active
+                        (this.activeTab === 'Low Shelf' && row.lowShelf > 0 && row.lowShelf < 60) ||                       
+                        (this.activeTab === 'Sales Last 15 Days');
 
                     const matchesFilters = Object.entries(this.filters).every(([key, value]) => {
                         if (!value) return true;
@@ -286,8 +317,11 @@ export default {
                         if (key === 'currentInventory') {
                             const totalInventory = row.expiryDetails.reduce((sum, detail) => sum + (detail.count || 0), 0);
                             return totalInventory.toString().includes(value.toString());
+                        }if (key === 'lowShelf') {
+                            const filterValue = parseFloat(value) || 0;
+                            const rowValue = parseFloat(row.lowShelf) || 0;
+                            return rowValue <= filterValue;
                         }
-
                         return String(row[key] || '').toLowerCase().includes(String(value).toLowerCase());
                     });
 
@@ -314,14 +348,21 @@ export default {
                 return {
                     ...row,
                     currentInventory: row.expiryDetails.reduce((sum, detail) => sum + (detail.count || 0), 0),
-                    expiryDate: expiryDisplay || ''
+                    expiryDate: expiryDisplay || '',
+                    lowShelf: row.lowShelf ? `${row.lowShelf}%` : '0%'
                 };
             });
 
             if (this.sortConfig.key) {
                 filtered = filtered.sort((a, b) => {
-                    if (a[this.sortConfig.key] < b[this.sortConfig.key]) return this.sortConfig.asc ? -1 : 1;
-                    if (a[this.sortConfig.key] > b[this.sortConfig.key]) return this.sortConfig.asc ? 1 : -1;
+                    let aValue = a[this.sortConfig.key];
+                    let bValue = b[this.sortConfig.key];
+                    if (this.sortConfig.key === 'lowShelf') {
+                        aValue = parseFloat(aValue) || 0;
+                        bValue = parseFloat(bValue) || 0;
+                    }
+                    if (aValue < bValue) return this.sortConfig.asc ? -1 : 1;
+                    if (aValue > bValue) return this.sortConfig.asc ? 1 : -1;
                     return 0;
                 });
             }
@@ -330,12 +371,50 @@ export default {
         },
     },
     methods: {
+        onFilterChange() {
+            // console.log('Filter changed, lowShelf filter:', this.filters.lowShelf); // Debug log
+            this.$forceUpdate();
+        },
         toggleSort(key) {
             if (this.sortConfig.key === key) {
                 this.sortConfig.asc = !this.sortConfig.asc;
             } else {
                 this.sortConfig.key = key;
                 this.sortConfig.asc = true;
+            }
+        },
+        async fetchInventoryData() {
+            const vendorCode = this.$route.params.vendorCode;
+            try {
+                const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/inventory/${vendorCode}`);
+                if (response.data && response.data.success) {
+                    this.inventoryData = response.data.data.inventory;
+                    await this.fetchLowShelfData();
+                }
+            } catch (error) {
+                console.error('Error fetching inventory:', error);
+            }
+        },
+        async fetchLowShelfData() {
+            try {
+                const response = await axios.get(`${import.meta.env.VITE_BACKEND_NODE}/api/expiry-percentage`, {
+                    params: { vendorCode: this.$route.params.vendorCode }
+                });
+                if (response.data) {
+                    this.lowShelfData = response.data;
+                    // Merge lowShelf data into inventoryData
+                    const lowShelfMap = this.lowShelfData.reduce((map, item) => {
+                        map[item.skuCode] = item.expiryProgress || 0;
+                        return map;
+                    }, {});
+                    this.inventoryData = this.inventoryData.map(item => ({
+                        ...item,
+                        lowShelf: lowShelfMap[item.skuCode] || 0
+                    }));
+                    // console.log('Merged Inventory Data:', this.inventoryData); // Debug log
+                }
+            } catch (error) {
+                console.error('Error fetching low shelf data:', error.message, error.response ? error.response.data : 'No response data');
             }
         },
         async handleFileUpload(event) {
@@ -497,6 +576,9 @@ export default {
             }).then(() => {
                 // Fetch inventory data after the route has been updated
                 this.fetchInventoryData();
+                if (this.activeTab === 'Low Shelf') {
+                this.fetchLowShelfData();
+            }
             });
         },
         async downloadExcel() {
@@ -625,21 +707,35 @@ export default {
         }
     },
     mounted() {
+        // console.log('Component mounted, activeTab:', this.activeTab);
+        // this.fetchInventoryData();
+        // this.fetchVendors();
+        // if (this.activeTab === 'Sales Last 15 Days') {
+        //     this.fetchSalesLast15Days();
+        // }
+        // if (this.activeTab === 'Low Shelf') {
+        // this.fetchLowShelfData();
+        // }
         this.fetchInventoryData();
         this.fetchVendors();
-        if (this.activeTab === 'Sales Last 15 Days') {
-            this.fetchSalesLast15Days();
-        }
+        this.fetchLowShelfData();
+        this.fetchSalesLast15Days();
+    
     },
-    watch: {
-        activeTab(newTab) {
-            if (newTab === 'Sales Last 15 Days') {
-                this.fetchSalesLast15Days();
-            }
-        }
-    }
+    // watch: {
+    //     activeTab(newTab) {
+    //         if (newTab === 'Sales Last 15 Days') {
+    //             this.fetchSalesLast15Days();
+    //         } else if (newTab === 'Low Shelf') {
+    //         this.fetchLowShelfData();
+    //         }
+    //     }
+    // }
 };
 </script>
+
+
+
 
 <style scoped>
 .inventory-container {
