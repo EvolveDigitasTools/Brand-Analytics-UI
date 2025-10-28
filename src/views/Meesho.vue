@@ -88,11 +88,11 @@ export default {
             reader.read().then(({ done, value }) => {
               if (done) {
                 this.uploading = false;
-                console.log("Stream completed, total results:", this.results.length);
+                // console.log("Stream completed, total results:", this.results.length);
                 return;
               }
               const chunk = decoder.decode(value, { stream: true });
-              console.log("Received chunk:", chunk);
+              // console.log("Received chunk:", chunk);
               const lines = chunk.split("\n").filter(Boolean);
 
               lines.forEach((line) => {
@@ -115,7 +115,7 @@ export default {
                       this.uploading = false;
                     }
                   } catch (parseErr) {
-                    console.error("Error parsing SSE data:", parseErr, line);
+                    // console.error("Error parsing SSE data:", parseErr, line);
                     this.error = `Parsing error: ${parseErr.message}`;
                   }
                 }
@@ -123,7 +123,7 @@ export default {
 
               read(); // Continue reading the stream
             }).catch((err) => {
-              console.error("Error reading stream:", err);
+              // console.error("Error reading stream:", err);
               this.uploading = false;
               this.error = `Stream read failed: ${err.message}`;
               this.results.push({ error: `Stream read failed: ${err.message}` });
@@ -133,7 +133,7 @@ export default {
           read();
         })
         .catch((err) => {
-          console.error("SSE upload failed:", err);
+          // console.error("SSE upload failed:", err);
           this.uploading = false;
           this.error = `Upload failed: ${err.message}`;
           this.results.push({ error: `Upload failed: ${err.message}` });
@@ -160,7 +160,7 @@ export default {
 }
 
 .upload-page {
-  max-width: 900px;
+  max-width: 1200px;
   justify-content: center;
   align-items: center;
   margin: 20px auto;
