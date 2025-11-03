@@ -1,4 +1,5 @@
-<template>
+<template class="main-ui">
+  <div class="sku_mapp">
   <div class="sku-mapping-card">
     <h3>SKU Mapping</h3>
 
@@ -31,6 +32,7 @@
         </ul>
       </div>
     </div>
+  </div>
   </div>
 </template>
 
@@ -165,19 +167,44 @@ export default {
   padding: 15px;
   background: #eef5ff;
   border-radius: 6px;
-  border-left: 4px solid #4cafef;
+  border-left: 4px solid #75bfb0;
 }
 
 .summary h4 {
   margin-bottom: 10px;
-  color: #0077cc;
+  color: #75bfb0;
 }
 
 .missing {
+  margin-top: 0px;
+  color: red !important;
+  font-weight: bold;
+   padding-bottom: 20px;
+    padding-top: 20px;
+}
+
+.missing p {
   margin-top: 10px;
-  color: red;
+  color: red !important;
   font-weight: bold;
 }
+
+.missing p b {
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    font-size: 15px;
+}
+
+.missing ul li {
+    color: #ea1414 !important;
+    display: inline-flex;
+    gap: 20px;
+    padding-left: 0px;
+        font-weight: 600;
+    padding-right: 20px;
+}
+
+
 .progress-container {
   margin-top: 10px;
   background: #eee;
@@ -200,6 +227,118 @@ export default {
   left: 50%;
   transform: translateX(-50%);
   font-size: 12px;
+  color: #fff;
+}
+
+
+/* sanchit css */
+
+.sku_mapp {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 30px;
+  height: 100%;
+  background: #f2f5f7;
+}
+
+.sku-mapping-card {
+  background: #f2f5f7;
+  border-radius: 20px;
+  padding: 30px;
+  width: 580px;
+  box-shadow: 10px 10px 20px #d1d9e6, -10px -10px 20px #ffffff;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.sku-mapping-card:hover {
+  box-shadow: inset 5px 5px 10px #d1d9e6, inset -5px -5px 10px #ffffff;
+}
+
+.sku-mapping-card h3 {
+  font-weight: 600;
+  
   color: #333;
 }
+
+/* ✅ Buttons (neumorphic) */
+.sku-mapping-card .btn {
+  width: 100%;
+  margin: 10px 0;
+  padding: 12px;
+  border: none;
+  border-radius: 50px;
+  background: #75BFB0;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  /* box-shadow: 0px 0px 0px #75BFB0, 0px 0px 12px #75BFB0; */
+  transition: all 0.25s ease-in-out;
+}
+
+.sku-mapping-card .btn:hover {
+  background: linear-gradient(145deg, #75BFB0, #75BFB0);
+  /* box-shadow: inset 0px 0px 0px #75BFB0, inset 0px 0px 6px #75BFB0; */
+  transform: translateY(2px);
+}
+
+.sku-mapping-card input[type="file"] {
+ margin: 10px 0 20px;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #f2f5f7;
+  border: none;
+  box-shadow: inset 2px 2px 5px #d1d9e6, inset -2px -2px 5px #fff;
+  width: 100%;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s ease-in-out;
+}
+
+/* ✅ Progress Bar */
+.progress-container {
+  margin-top: 15px;
+  text-align: left;
+}
+
+.progress-bar {
+  height: 20px;
+  background: linear-gradient(90deg, #4caf50, #81c784);
+  border-radius: 10px;
+  box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1);
+  transition: width 0.3s ease;
+}
+
+/* ✅ Summary */
+.summary {
+  margin-top: 25px;
+  text-align: left;
+  padding: 15px;
+  border-radius: 12px;
+  background: #f2f5f7;
+  box-shadow: inset 4px 4px 8px #d1d9e6, inset -4px -4px 8px #ffffff;
+}
+
+.summary h4 {
+  margin-bottom: 10px;
+  color: #333;
+  font-size: 15px;
+    font-weight: 600;
+}
+
+.summary p,
+.summary li {
+  font-size: 13px;
+  color: #555;
+}
+
+.summary .missing ul {
+  margin-top: 5px;
+  padding-left: 15px;
+}
+
+
+
 </style>

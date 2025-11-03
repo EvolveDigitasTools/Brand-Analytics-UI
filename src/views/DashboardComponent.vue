@@ -20,12 +20,6 @@
             <h3>Total Units Sales (Last 15 Days)</h3>
             <div class="total-amount">📦{{ salesData.totalUnits }}</div>
           </div>
-          <div class="trends-controls">
-            <select v-model="timeFilter">
-              <option value="today">Today ({{ salesData.todayUnits }})</option>
-            </select>
-            <button class="export-btn">Export</button>
-          </div>
         </div>
 
         <div class="chart-wrapper">
@@ -33,40 +27,70 @@
         </div>
       </div>
 
-      <!-- NEW: Recent Activity – Top 10 Selling Products -->
+      <!-- Top 10 Selling Products (Last 30 Days) -->
       <div class="top-selling">
         <div class="top-selling-header">
-          <h3>Top 10 Selling Products</h3>
-          <button class="add-new-btn">+ Add New</button>
+          <h3><strong>Top 10 Selling Products (Last 30 Days)</strong></h3>
         </div>
 
         <div class="top-selling-list">
-          <div v-for="(item, i) in topSelling" :key="i" class="selling-item">
+          <div v-for="(item, i) in visibleTopSelling" :key="i" class="selling-item">
             <div class="selling-sku-date">
-              <div class="sku">#{{ item.skuCode }}</div>
+              <div class="sku">{{ item.skuCode }}</div>
               <div class="date">{{ formatDate(item.date) }}</div>
             </div>
             <div class="selling-name">{{ item.productName }}</div>
-            <div class="selling-qty" :class="{ positive: item.soldQty > 0, negative: item.soldQty < 0 }">
-              {{ item.soldQty > 0 ? '+' : '' }}{{ item.soldQty }}
+            <div class="selling-qty" 
+                :class="{ positive: item.soldQty > 0, negative: item.soldQty < 0 }"
+              >
+                <span v-if="item.soldQty > 0" class="mdi mdi-finance"></span>
+                {{ item.soldQty }}
             </div>
           </div>
         </div>
 
-        <div class="view-all">
-          <a href="#" @click.prevent="viewAllActivity">View All</a>
+        <div class="view-all" v-if="topSelling.length > 5">
+          <a href="#" @click.prevent="showAllTopSelling = !showAllTopSelling">
+            {{ showAllTopSelling ? 'View Less' : 'View All' }}
+          </a>
         </div>
       </div>
 
       <!-- Donut Chart -->
-      <div class="chart-container">
-        <div class="chart-main">
-          <canvas :key="'donut-' + overview.length" ref="donutCanvas" width="300" height="300"></canvas>
-        </div>
-        <div class="chart-legend">
-          <div v-for="(item, i) in donutData" :key="i" class="legend-item">
-            <div class="color-block" :style="{ backgroundColor: donutColors[i] }"></div>
-            <div class="legend-label">{{ item.label }} ({{ item.value }})</div>
+      <div v-if="data" class="chart-container">
+        <div class="chart-wrapper">
+          <div class="chart-main">
+            <canvas ref="donutCanvas"></canvas>
+          </div>
+          <div class="chart-legend">
+            <div class="total-box">
+              <h3>Total Inventory</h3>
+              <div class="total-value">{{ data.totalInventory }}</div>
+              <router-link 
+                to="/dashboard/inventory"
+                class="view-all-link"
+              >
+                View All Inventory
+              </router-link>
+            </div>
+
+            <div class="vendor-list">
+              <div 
+                v-for="(vendor, index) in filteredVendors"
+                :key="vendor.vendorCode"
+                class="vendor-item"
+                @click="navigateToVendor(vendor.vendorCode)"
+              >
+                <div 
+                  class="color-block"
+                  :style="{ backgroundColor: colors[index] }"
+                ></div>
+                <div class="vendor-details">
+                  <div class="vendor-name">{{ vendor.vendorName }}</div>
+                  <div class="vendor-count">{{ vendor.inventoryCount }} items</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -116,9 +140,13 @@ export default {
     return {
       loading: true,
       error: false,
+      data: null,
+      chart: null,
+      colors: [],
       overview: [],
       salesData: { brands: [], totalUnits: 0, todayUnits: 0 },
       topSelling: [],
+      showAllTopSelling: false,
       timeFilter: "today",
       donutChart: null,
       barChart: null,
@@ -147,7 +175,8 @@ export default {
         { label: "Slow Moving", value: this.totalSummary.slowMoving, class: "slow", filter: "slowMoving" },
         { label: "Expiry Soon", value: this.totalSummary.expirySoon, class: "expiry", filter: "expirySoon" },
         { label: "Avg Shelf Life", value: `${this.totalSummary.avgShelfLifeDays} days`, class: "shelf", filter: null },
-        { label: "Sales (6M)", value: this.totalSummary.salesLast6Months, class: "sales", filter: "salesLast6Months" },
+        { label: "Sales Last 6 Months", value: this.totalSummary.salesLast6Months, class: "sales", filter: "salesLast6Months" },
+        { label: "RTO Last 6 Months", value: this.totalSummary.salesLast6Months, class: "sales", filter: "salesLast6Months" },        
       ];
     },
     donutData() {
@@ -167,15 +196,22 @@ export default {
       if (this.activeSection === "expirySoon") data = data.filter(v => v.expirySoon > 0);
       return data;
     },
+    visibleTopSelling() {
+      return this.showAllTopSelling 
+        ? this.topSelling 
+        : this.topSelling.slice(0, 5);
+    },
+    filteredVendors() {
+      const vendors = this.data?.vendorInventory || [];
+      return vendors.filter(v => v && v.inventoryCount > 0);
+    },
   },
-
   mounted() {
     this.loadAllData();
   },
-
   updated() {
     this.$nextTick(() => {
-      this.renderDonut();
+      if (this.data) this.renderDonut();
       this.renderBarChart();
     });
   },
@@ -184,16 +220,21 @@ export default {
     async loadAllData() {
       this.loading = true;
       try {
-        const [overviewRes, salesRes, sellingRes] = await Promise.all([
+        const [overviewRes, salesRes, sellingRes, vendorRes] = await Promise.all([
           axios.get(`${import.meta.env.VITE_BACKEND_NODE}/api/overview-inventory`),
           axios.get(`${import.meta.env.VITE_BACKEND_NODE}/api/sales-last-15-days-by-brand`),
-          axios.get(`${import.meta.env.VITE_BACKEND_NODE}/api/top-selling`)
+          axios.get(`${import.meta.env.VITE_BACKEND_NODE}/api/top-selling`),
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/inventory/overview`)
         ]);
 
         if (overviewRes.data.success) this.overview = overviewRes.data.data;
         if (salesRes.data.success) this.salesData = salesRes.data.data;
-        if (sellingRes.data.sucess) this.topSelling = sellingRes.data.data.slice(0, 10);
-
+        if (sellingRes.data.success) this.topSelling = sellingRes.data.data.slice(0, 10);
+        if (vendorRes.data) {
+            this.data = vendorRes.data; 
+            const validVendors = (this.data.vendorInventory || []).filter(v => v && v.inventoryCount > 0);
+            this.colors = this.generateColors(validVendors.length);
+          }
       } catch (err) {
         console.error("Load failed:", err);
         this.error = true;
@@ -213,21 +254,80 @@ export default {
     },
 
     renderDonut() {
-      if (this.donutChart) this.donutChart.destroy();
-      const canvas = this.$refs.donutCanvas;
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+    if (this.donutChart) this.donutChart.destroy();
+    const canvas = this.$refs.donutCanvas;
+    if (!canvas || !this.data) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-      this.donutChart = new Chart(ctx, {
-        type: "doughnut",
-        data: {
-          labels: this.donutData.map(i => i.label),
-          datasets: [{ data: this.donutData.map(i => i.value), backgroundColor: this.donutColors }],
+    const vendors = (this.data.vendorInventory || []).filter(v => v && v.inventoryCount > 0);
+    if (vendors.length === 0) {
+      ctx.font = "16px Arial";
+      ctx.fillStyle = "#999";
+      ctx.textAlign = "center";
+      ctx.fillText("No vendor data", canvas.width / 2, canvas.height / 2);
+      return;
+    }
+
+    const labels = this.filteredVendors.map(v => v.vendorName);
+    const data = this.filteredVendors.map(v => v.inventoryCount);
+
+    if (this.colors.length !== vendors.length) {
+      this.colors = this.generateColors(vendors.length);
+    }
+
+    this.donutChart = new Chart(ctx, {
+      type: "doughnut",
+      data: {
+        labels,
+        datasets: [{
+          data,
+          backgroundColor: this.colors,
+          borderWidth: 2,
+          hoverBorderWidth: 3,
+          hoverOffset: 10,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: "75%",
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (context) => `${context.label}: ${context.parsed} items`,
+            },
+          },
         },
-        options: { responsive: true, cutout: "70%", plugins: { legend: { display: false } } },
-      });
-    },
+        onClick: (event, elements) => {
+          if (elements.length > 0) {
+            const vendorCode = this.filteredVendors[elements[0].index].vendorCode;
+            this.navigateToVendor(vendorCode);
+          }
+        },
+      },
+      plugins: [{
+        id: "centerText",
+        beforeDraw: (chart) => {
+          const { ctx, chartArea } = chart;
+          ctx.save();
+          const x = (chartArea.left + chartArea.right) / 2;
+          const y = (chartArea.top + chartArea.bottom) / 2;
+
+          ctx.font = "bold 24px Arial";
+          ctx.fillStyle = "#333";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(this.data.totalInventory, x, y);
+
+          ctx.font = "14px Arial";
+          ctx.fillText("Total Items", x, y + 30);
+          ctx.restore();
+        },
+      }],
+    });
+  },
 
     renderBarChart() {
       if (this.barChart) this.barChart.destroy();
@@ -274,34 +374,127 @@ export default {
     filterByBrand(brand) { this.activeBrand = brand; },
     filterBySection(section) { this.activeSection = section; },
     resetFilters() { this.activeBrand = null; this.activeSection = null; },
+
+    generateColors(count) {
+    const colors = [];
+    const hueStep = count > 0 ? 360 / count : 0;
+    for (let i = 0; i < count; i++) {
+      colors.push(`hsl(${hueStep * i}, 70%, 50%)`);
+    }
+      return colors;
+    },
+
+    navigateToVendor(vendorCode) {
+      this.$router.push(`/dashboard/inventory/${vendorCode}`);
+    },
   },
-};
+}
 </script>
 
 <style scoped>
-.inventory-overview { padding: 1.5rem; }
-.overview-cards { display: flex; flex-wrap: wrap; gap: 1rem; margin: 1.5rem 0; }
-.card { flex: 1; min-width: 180px; background: #f8f9fa; border-radius: 10px; padding: 1rem; text-align: center; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.1); transition: 0.2s; }
-.card:hover { transform: translateY(-3px); }
-
-.chart-container { display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; margin: 1.5rem 0; }
-.chart-main { width: 300px; height: 300px; }
-
-.overview-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-.overview-table th, .overview-table td { padding: 0.75rem; border: 1px solid #ddd; text-align: center; font-size: 14px; }
-.clickable-row:hover { background: #f3f8ff; cursor: pointer; }
-
-.sales-trends { margin: 2rem 0; padding: 1.5rem; background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-.trends-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.trends-header h3 { margin: 0; font-size: 1.1rem; color: #555; }
-.total-amount { font-size: 2rem; font-weight: bold; color: #333; margin-top: 0.5rem; }
-.trends-controls { display: flex; gap: 0.5rem; align-items: center; }
-.trends-controls select { padding: 0.4rem 0.8rem; border: 1px solid #ddd; border-radius: 6px; }
-.export-btn { background: #f8f9fa; border: 1px solid #ddd; padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
-
+.inventory-overview { 
+  margin: 2rem auto;
+  padding: 2rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
+}
+.overview-cards { 
+  display: flex; 
+  flex-wrap: wrap; 
+  gap: 1rem; 
+  margin: 1.5rem 0; 
+}
+.card { 
+  flex: 1; 
+  min-width: 180px; 
+  background: #f8f9fa; 
+  border-radius: 10px; 
+  padding: 1rem; 
+  text-align: center; 
+  cursor: pointer; 
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1); 
+  transition: 0.2s; 
+}
+.card:hover { 
+  transform: translateY(-3px); 
+}
+.chart-container { 
+  display: flex; 
+  justify-content: space-around; 
+  align-items: center; 
+  flex-wrap: wrap; 
+  margin: 1.5rem 0; 
+}
+.chart-main { 
+  width: 300px; 
+  height: 300px; 
+}
+.chart-legend {
+  width: 300px;
+  padding: 1rem;
+  border-left: 1px solid #eee;
+}
+.overview-table { 
+  width: 100%; 
+  border-collapse: collapse; 
+  margin-top: 1rem; 
+}
+.overview-table th, .overview-table td { 
+  padding: 0.75rem; 
+  border: 1px solid #ddd; 
+  text-align: center; 
+  font-size: 14px; 
+}
+.clickable-row:hover { 
+  background: #f3f8ff; 
+  cursor: pointer; 
+}
+.sales-trends { 
+  margin: 2rem 0; 
+  padding: 1.5rem; 
+  background: #fff; 
+  border-radius: 12px; 
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
+}
+.trends-header { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  margin-bottom: 1rem; 
+}
+.trends-header h3 { 
+  margin: 0; 
+  font-size: 1.1rem; 
+  color: #555; 
+}
+.total-amount { 
+  font-size: 2rem; 
+  font-weight: bold; 
+  color: #333; 
+  margin-top: 0.5rem; 
+}
+.trends-controls { 
+  display: flex; 
+  gap: 0.5rem; 
+  align-items: center; 
+}
+.trends-controls select { 
+  padding: 0.4rem 0.8rem; 
+  border: 1px solid #ddd; 
+  border-radius: 6px; 
+}
+.export-btn { 
+  background: #f8f9fa; 
+  border: 1px solid #ddd; 
+  padding: 0.4rem 1rem; 
+  border-radius: 6px; 
+  cursor: pointer; 
+  font-size: 0.9rem; 
+}
 .chart-wrapper {
-  height: 300px;
-  width: 100%;
+  display: flex;
+  gap: 2rem;
   position: relative;
   background: #fff;
   border: 1px solid #eee;
@@ -396,5 +589,87 @@ export default {
 
 .view-all a:hover {
   text-decoration: underline;
+}
+
+.total-value {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #2c3e50;
+  margin: 1rem 0;
+}
+
+.view-all-link {
+  display: inline-block;
+  color: #3498db;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border: 1px solid #3498db;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.view-all-link:hover {
+  background-color: #3498db;
+  color: white;
+}
+
+.vendor-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.vendor-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.vendor-item:hover {
+  background-color: #f8f9fa;
+  transform: translateX(5px);
+}
+
+.color-block {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  margin-right: 1rem;
+}
+
+.vendor-details {
+  flex: 1;
+}
+
+.vendor-name {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.vendor-count {
+  font-size: 0.9rem;
+  color: #7f8c8d;
+}
+
+.loading, .error {
+  text-align: center;
+  padding: 2rem;
+  font-size: 1.2rem;
+}
+
+.error {
+  color: #dc3545;
+}
+
+canvas {
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+canvas:hover {
+  transform: scale(1.02);
 }
 </style>

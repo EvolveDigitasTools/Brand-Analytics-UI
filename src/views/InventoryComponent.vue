@@ -1,11 +1,12 @@
 <template>
+    <div class="inventory-page">
     <div class="inventory-container">
         <!-- Header Section -->
         <header class="inventory-header">
             <h1>Inventory Management</h1>
             <div class="header-controls">
-                <div>
-                    <div>
+                <div class="top-bar-vendor">
+                    <div class="filter-box">
                         <v-autocomplete label="Select Vendor"
                             :items="['All', ...vendors.map(vendor => vendor.brandName)]" v-model="selectedVendor"
                             @update:modelValue="onVendorChange"
@@ -13,75 +14,139 @@
                             class="custom-autocomplete"></v-autocomplete>
                     </div>
                 </div>
+                <div class="search-button-header">
                 <input type="text" v-model="searchQuery" placeholder="Search by SKU or Product Name"
                     class="search-input" />
+                    </div>
+                    <div class="top-button-header">
                 <button @click="showUpdateModal = true" class="btn-primary">
                     Stock Update
                 </button>
+                
+            </div>
             </div>
         </header>
 
         <!-- Inventory Tabs -->
+       <div class="inventory-tabs">
         <div class="tabs">
             <button v-for="tab in tabs" :key="tab" @click="activeTab = tab" :class="{ active: activeTab === tab }"
                 class="tab-btn">
                 {{ tab }}
             </button>
         </div>
+        </div>
 
         <!-- Inventory Table -->
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th v-for="column in columns" :key="column.key">
-                            <div class="column-header">
-                                <span>{{ column.label }}</span>
-                                <div class="filter-controls">
-                                    <template v-if="column.key === 'expiryDate'">
-                                        <div class="expiry-filter-wrapper">
-                                            <v-select
-                                                v-model="filters.expiryYearMonth"
-                                                :items="yearMonthOptions"
-                                                label="YYYY/MM"
-                                                class="filter-select"
-                                                clearable
-                                                dense
-                                                @update:modelValue="onExpiryFilterChange"
-                                            ></v-select>
-                                        </div>
-                                    </template>
-                                    <template v-else-if="column.key === 'lowShelf'">
-                                        <input v-model="filters.lowShelf" @input="onFilterChange" class="filter-input" />
-                                    </template>
-                                    <input v-else v-model="filters[column.key]" @click.stop class="filter-input" />
-                                    <button @click="toggleSort(column.key)" class="sort-btn">
-                                        {{ sortConfig.key === column.key ? (sortConfig.asc ? '↑' : '↓') : '⇅' }}
-                                    </button>
-                                </div>
-                            </div>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="row in filteredRows" :key="row.skuCode">
-                        <td>{{ row.skuCode }}</td>
-                        <td>{{ row.productTitle }}</td>
-                        <td>{{ row.currentInventory }}</td>
-                        <td>
-                        <template v-for="(detail, index) in row.expiryDetails" :key="index">
-                            <span>
-                            {{ detail.expiryDate }} ({{ detail.count }})<span v-if="index < row.expiryDetails.length - 1">,</span>
-                            </span>
-                            <br v-if="index < row.expiryDetails.length - 1">
-                        </template>
-                        </td>                      
-                        <td>{{ row.lowShelf }}</td>                        
-                        <td>{{ row.salesLast15Days }}</td>
-                    </tr>
-                </tbody>
-            </table>
+
+         <div class="inventory-main_table" style="border-radius: 20px;">
+        <div class="table-container" style="border-radius: 20px;">
+            <table style="border-radius: 20px;">
+  <thead>
+    <tr>
+      <th v-for="column in columns" :key="column.key"
+          style="background-color:#75bfb057; border:1px solid #8ed0c2; padding:8px 10px; text-align:center;">
+        <div style="display:flex; align-items:center; justify-content:start; gap:5px;">
+          
+          <!-- Expiry Date -->
+          <template v-if="column.key === 'expiryDate'">
+            <!--
+            <v-select
+              v-model="filters.expiryYearMonth"
+              :items="yearMonthOptions"
+              :label="column.label"
+              style="width:100%; max-width:150px; padding:6px 10px; border-radius:8px; border:1px solid #d1d5db; outline:none; background-color:#f9fafb; font-size:13px;"
+              clearable
+              dense
+              @update:modelValue="onExpiryFilterChange"
+            ></v-select>
+            -->
+
+<!--sanchit code for expiry-->
+            <v-select
+  v-model="filters.expiryYearMonth"
+  :items="yearMonthOptions"
+  placeholder="YYYY-MM"
+  hide-details
+  clearable
+  dense
+  @update:modelValue="onExpiryFilterChange"
+  style="
+    width: 140px;
+    height: 50px !important;
+    padding: 4px 8px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    outline: none;
+    background-color: #ffffff;
+    color: #333;
+    font-size: 13px;
+    display: block !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+  "
+></v-select>
+
+<!--sanchit code for expiry ends-->
+
+          </template>
+
+          <!-- Low Shelf -->
+          <template v-else-if="column.key === 'lowShelf'">
+            <input
+              v-model="filters.lowShelf"
+              @input="onFilterChange"
+              :placeholder="column.label"
+              style="width:100%; height: 50px !important; max-width:150px; color: #b2aeae; padding:6px 10px; border-radius:8px; border:1px solid #d1d5db; outline:none; background-color:#f9fafb; font-size:13px;"
+            />
+          </template>
+
+          <!-- Other Columns -->
+          <template v-else>
+            <input
+              v-model="filters[column.key]"
+              @input="onFilterChange"
+              :placeholder="column.label"
+              style="width:100%; height: 50px !important; max-width:200px; color: #b2aeae; padding:6px 10px; border-radius:8px; border:1px solid #d1d5db; outline:none; background-color:#f9fafb; font-size:13px;"
+            />
+          </template>
+
+          <!-- Sort Button -->
+          <button
+            @click="toggleSort(column.key)"
+            style="background:transparent; border:none; cursor:pointer; color:#000; font-size:14px;"
+          >
+            {{ sortConfig.key === column.key ? (sortConfig.asc ? '↑' : '↓') : '⇅' }}
+          </button>
+
         </div>
+      </th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <tr v-for="row in filteredRows" :key="row.skuCode"
+        style="background-color: white; border: 1px solid #e5e7eb;">
+      <td style="padding:8px;">{{ row.skuCode }}</td>
+      <td style="padding:8px;width: 480px;">{{ row.productTitle }}</td>
+      <td style="padding:8px;">{{ row.currentInventory }}</td>
+      <td style="padding:8px;">
+        <template v-for="(detail, index) in row.expiryDetails" :key="index">
+          <span>
+            {{ detail.expiryDate }} ({{ detail.count }})
+            <span v-if="index < row.expiryDetails.length - 1">,</span>
+          </span>
+          <br v-if="index < row.expiryDetails.length - 1" />
+        </template>
+      </td>
+      <td style="padding:8px;">{{ row.lowShelf }}</td>
+      <td style="padding:8px;">{{ row.salesLast15Days }}</td>
+    </tr>
+  </tbody>
+</table>
+
+        </div>
+</div>
 
         <!-- Stock Update Modal -->
         <div v-if="showUpdateModal" class="modal-overlay">
@@ -103,6 +168,7 @@
                 <button @click="showUpdateModal = false" class="close-btn">×</button>
             </div>
         </div>
+    </div>
     </div>
 </template>
 
@@ -755,6 +821,7 @@ export default {
 <style scoped>
 .inventory-container {
     padding: 20px;
+    background-color: #F0F3F5;
     margin: 0 auto;
 }
 
@@ -762,7 +829,7 @@ export default {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 30px;
 }
 
 .header-controls {
@@ -957,4 +1024,477 @@ td:nth-child(5) {
    white-space: break-spaces;
     word-break: break-word;
 }
+
+/* sanchit css */
+
+header.inventory-header {
+    padding: 20px;
+    background: #fff;
+    background: #ecf0f3;
+    border-radius: 20px;
+    box-shadow: 14px 14px 20px #cbced1, -14px -14px 20px #fff;
+    color: #424141;
+    padding: 20px 40px 20px 40px;
+    transition: all .3s ease-in-out;
+}
+
+.inventory-header .header-controls {
+    align-items: center;
+}
+
+.inventory-header h1 {
+    font-size: 23px;
+    font-weight: 500;
+    font-family: system-ui;
+}
+
+.inventory-header .v-input.v-input--horizontal.v-input--center-affix.v-input--density-default.v-theme--light.v-locale--is-ltr.v-input--dirty.v-text-field.v-autocomplete.v-autocomplete--single.custom-autocomplete {
+ border-radius: 50px !important;
+    box-shadow: inset 6px 6px 6px #cbced1, inset -6px -6px 6px #fff !important;
+    background-color: #ecf0f3;
+    padding: 0 25px !important;
+ 
+}
+
+.filter-box .v-field--variant-filled .v-field__overlay {
+    opacity: 0 !important;
+        background-color: rgb(66 65 65 / 0%) !important;
+}
+
+.filter-box .v-field--variant-filled .v-field__overlay:hover {
+     opacity: 0 !important;
+        background-color: rgb(66 65 65 / 0%) !important;
+}
+
+.filter-box .v-field--variant-filled.v-field--focused .v-field__overlay {
+     opacity: 0 !important;
+        background-color: rgb(66 65 65 / 0%) !important;
+}
+
+.filter-box .v-field--variant-filled:hover .v-field__overlay {
+     opacity: 0 !important;
+        background-color: rgb(66 65 65 / 0%) !important;
+}
+
+
+
+.top-button-header button{ 
+background: #75bfb0 !important;
+    border: none !important;
+    border-radius: 40px !important;
+    box-shadow: 6px 6px 6px #cbced1, -6px -6px 6px #fff;
+    color: #fff !important;
+    cursor: pointer;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    height: 50px !important;
+    transition: .3s;
+    padding: 10px 30px;
+    }
+
+
+    .search-button-header input {
+        border-radius: 50px !important;
+    box-shadow: inset 6px 6px 6px #cbced1, inset -6px -6px 6px #fff !important;
+    font-size: 15px !important;
+    height: 55px !important;
+    padding: 0 25px !important;
+    }
+
+    /* .search-button-header input.focus-visible {
+       border: 1px solid #75bfb0;
+    } */
+
+   .filter-box .v-field--variant-filled .v-field__overlay {
+ border-radius: 50px !important;
+    box-shadow: inset 6px 6px 6px #cbced1, inset -6px -6px 6px #fff !important;
+    font-size: 15px !important;
+    height: 55px !important;
+    padding: 0 25px !important;
+   }
+
+.inventory-tabs {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin: 50px 0px 30px 0px;
+  }
+
+.inventory-tabs .tabs {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 0px;
+  gap: 18px;
+}
+
+.inventory-tabs .tab-btn {
+  flex: 1; /* makes all buttons equal width */
+  padding: 14px 0;
+  border: none;
+  border-radius: 20px;
+  background: #f5f8fa;
+  box-shadow: 6px 6px 12px #d1d9e6, -6px -6px 12px #ffffff;
+  color: #333;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: "Poppins", sans-serif;
+  font-size: 15px;
+  transition: all 0.25s ease;
+  text-align: center;
+}
+
+.inventory-tabs .tab-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 4px 4px 10px #d1d9e6, -4px -4px 10px #ffffff;
+
+}
+
+.inventory-tabs .tab-btn.active {
+  background: #6ab9a3;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: inset 4px 4px 10px #58a38e, inset -4px -4px 10px #7ed1b7;
+}
+
+
+
+/* master inventory table */
+
+/* === INVENTORY TABLE FINAL DESIGN === */
+.inventory-main_table .column-header span {
+  font-weight: 600;
+  font-size: 17px;
+}
+
+.inventory-main_table .table-container {
+  width: 100%;
+  overflow-x: auto;
+  background: #eef1f4;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+/* TABLE BASE */
+.inventory-main_table .table-container table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  font-family: "Segoe UI", sans-serif;
+  font-size: 14px;
+  color: #333;
+}
+
+/* HEADER STYLING */
+.inventory-main_table .table-container th {
+  background-color: #6bb9a6 !important;
+  color: #fff;
+  text-align: center;
+  font-weight: 600;
+  padding: 10px 12px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* HEADER STRUCTURE */
+.inventory-main_table .column-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* FILTER AREA FIX */
+.inventory-main_table .filter-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+
+/* FILTER INPUTS */
+.inventory-main_table th input[type="text"],
+.inventory-main_table th input[type="date"],
+.inventory-main_table th select {
+  width: 95% !important;
+  min-width: 150px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1), inset -2px -2px 5px rgba(255,255,255,0.6);
+  font-size: 13px;
+  outline: none;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.inventory-main_table th input:focus,
+.inventory-main_table th select:focus {
+  box-shadow: 0 0 0 2px #4caf50;
+}
+
+/* EXPIRY FILTER FIX */
+.inventory-main_table .expiry-filter-wrapper {
+   display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.inventory-main_table .expiry-filter-wrapper .v-select {
+  width: 95% !important;
+  min-width: 150px;
+  height: 36px !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* .inventory-main_table .v-field__input {
+  padding-top: 1px !important;
+} */
+
+/* Fix expiry date v-select field appearance */
+.inventory-main_table .v-select {
+   background-color: #ffffff !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 8px !important;
+  padding: 0 8px !important;
+  min-width: 130px !important;
+  max-width: 150px !important;
+  height: 38px !important;
+  display: flex !important;
+  align-items: center !important;
+  overflow: visible !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  font-size: 13px !important;
+}
+
+.inventory-main_table .v-field__outline,
+.inventory-main_table .v-field__overlay {
+  display: none !important;
+}
+
+/* Align placeholder text properly */
+.inventory-main_table .v-field__input {
+   padding: 0 6px !important;
+  font-size: 13px !important;
+  color: #333 !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  overflow: visible !important;
+}
+
+/* Placeholder style for YYYY-MM */
+.inventory-main_table .v-field__input::placeholder {
+   color: #888 !important;
+  opacity: 1 !important;
+}
+
+/* Remove background tint on hover */
+.inventory-main_table .v-select:hover {
+  background-color: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  transition: box-shadow 0.3s ease;
+}
+
+.inventory-main_table .v-select__selection-text {
+  color: #333 !important;
+  font-size: 13px !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+}
+
+.inventory-main_table .v-select__clear {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  right: 6px !important;
+  opacity: 0.7 !important;
+  transition: opacity 0.2s ease;
+}
+
+.inventory-main_table .v-select__clear:hover {
+  opacity: 1 !important;
+}
+
+/* Ensure dropdown icon stays inside */
+.inventory-main_table .v-select__icon {
+ color: #666 !important;
+  margin-right: 4px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Fix expiry date v-select field appearance */
+.inventory-main_table .v-select {
+  background-color: #ffffff !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 8px !important;
+  padding: 2px 8px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  min-width: 175px !important;
+  max-width: 175px !important;
+  height: 32px !important;
+}
+
+/* Hide Vuetify floating label overlay */
+.inventory-main_table .v-field__overlay,
+.inventory-main_table .v-field__outline {
+  display: none !important;
+}
+
+/* Align placeholder text properly */
+.inventory-main_table .v-field__input {
+  padding: 0 6px !important;
+  font-size: 13px !important;
+  color: #333 !important;
+  opacity: 1 !important;
+}
+
+/* Placeholder style for YYYY-MM */
+.inventory-main_table .v-field__input::placeholder {
+  color: #999 !important;
+}
+
+/* Remove background tint on hover */
+.inventory-main_table .v-select:hover {
+  background-color: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  transition: box-shadow 0.3s ease;
+}
+
+/* Ensure dropdown icon stays inside */
+.inventory-main_table .v-select__icon {
+  margin-right: 6px !important;
+  color: #666 !important;
+}
+
+
+.v-select .v-field .v-text-field__prefix, .v-select .v-field .v-text-field__suffix, .v-select .v-field .v-field__input, .v-select .v-field.v-field {
+    padding: 2px 5px 0px 5px !important;
+}
+
+
+.inventory-main_table .expiry-filter-wrapper .v-field {
+  min-height: 36px !important;
+  height: 36px !important;
+  background: #fff !important;
+  border-radius: 10px !important;
+  box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1),
+              inset -2px -2px 5px rgba(255,255,255,0.6);
+  border: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px !important;
+}
+
+.inventory-main_table .expiry-filter-wrapper .v-field__input {
+  font-size: 13px !important;
+  color: #333 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+  height: 36px !important;
+}
+
+.inventory-main_table .expiry-filter-wrapper .v-select__icon,
+.inventory-main_table .expiry-filter-wrapper .v-select__selection {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 36px !important;
+}
+
+/* SORT BUTTON */
+.inventory-main_table .sort-btn {
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  cursor: pointer;
+  color: #fff;
+  transition: transform 0.2s ease;
+}
+
+.inventory-main_table .sort-btn:hover {
+  transform: scale(1.2);
+}
+
+/* BODY STYLING */
+.inventory-main_table .table-container td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e0e0e0;
+  vertical-align: top;
+  line-height: 1.5;
+}
+
+/* ROW COLORS */
+.inventory-main_table .table-container tbody tr:nth-child(odd) {
+  background-color: #ffffff;
+}
+
+.inventory-main_table .table-container tbody tr:nth-child(even) {
+  background-color: #f8f9fa;
+}
+
+/* HOVER EFFECT */
+.inventory-main_table .table-container tbody tr:hover {
+  background-color: #e7f5f1;
+  transition: background-color 0.2s ease;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .inventory-main_table .table-container table {
+    font-size: 13px;
+  }
+
+  .inventory-main_table th input[type="text"],
+  .inventory-main_table th input[type="date"],
+  .inventory-main_table th select {
+    width: 80% !important;
+    min-width: 100px;
+  }
+}
+
+/* SIDEBAR FIX */
+nav.v-navigation-drawer.v-navigation-drawer--left.v-navigation-drawer--expand-on-hover.v-navigation-drawer--rail.v-navigation-drawer--active.v-theme--light {
+  position: fixed !important;
+}
+
+/* EXPIRY DATE WIDTH TUNING */
+.inventory-main_table th:nth-child(5) input[type="date"] {
+  width: 95% !important;
+  min-width: 150px;
+}
+
+/* ALIGN HEADER CELLS */
+.inventory-main_table thead tr {
+  vertical-align: middle;
+}
+
+
+@media (max-width: 900px) {
+  .inventory-tabs .tabs {
+    flex-wrap: wrap;
+  }
+
+  .inventory-tabs .tab-btn {
+    flex: 1 1 45%;
+    min-width: 180px;
+  }
+}
+
+.v-input.v-input--horizontal.v-input--center-affix.v-input--density-default.v-theme--light.v-locale--is-ltr.v-text-field.v-select.v-select--single {
+    height: 35px !important;
+}
+
 </style>
+
