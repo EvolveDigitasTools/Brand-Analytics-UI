@@ -17,8 +17,18 @@
       <div class="sales-trends">
         <div class="trends-header">
           <div>
-            <h3>Total Units Sales (Last 15 Days)</h3>
-            <div class="total-amount">📦{{ salesData.totalUnits }}</div>
+            <h3>{{
+              salesChartMode === 'slowMoving' ? 'Slow Moving SKUs by Brand' :
+              salesChartMode === 'expirySoon' ? 'Expiry Soon SKUs by Brand' :
+              'Total Units Sales (Last 15 Days)'
+            }}</h3>
+            <div class="total-amount">
+              {{ 
+                salesChartMode === 'slowMoving' ? totalSummary.slowMoving :
+                salesChartMode === 'expirySoon' ? totalSummary.expirySoon :
+                salesData.totalUnits 
+              }}
+            </div>
           </div>
         </div>
 
@@ -107,17 +117,53 @@
             <th>Sales (Last 6 Months)</th>
           </tr>
         </thead>
+
         <tbody>
-          <tr v-for="(v, i) in filteredOverview" :key="i" @click="filterByBrand(v.brandName)" class="clickable-row">
-            <td>{{ v.brandName }}</td>
-            <td>{{ v.totalInventory || 0 }}</td>
-            <td>{{ v.slowMoving }}</td>
-            <td>{{ v.expirySoon }}</td>
-            <td>{{ v.avgShelfLifeDays ?? '-' }}</td>
-            <td>{{ v.salesLast6Months }}</td>
-          </tr>
+          <template v-for="(v, i) in filteredOverview" :key="i">
+            <tr
+              @click="toggleBrandDetails(v.brandName)"
+              class="clickable-row"
+            >
+              <td>{{ v.brandName }}</td>
+              <td>{{ v.totalSkus }}</td>
+              <td>{{ v.slowMoving }}</td>
+              <td>{{ v.expirySoon }}</td>
+              <td>{{ v.avgShelfLifeDays ?? '-' }}</td>
+              <td>{{ v.salesLast6Months }}</td>
+            </tr>
+
+            <tr v-if="expandedBrand === v.brandName" class="sku-details-row">
+              <td colspan="6">
+                <div v-if="loadingSkus">Loading SKUs...</div>
+                <div v-else>
+                  <table class="sku-table">
+                    <thead>
+                      <tr>
+                        <th>SKU Code</th>
+                        <th>SKU Name</th>
+                        <th>Quantity</th>
+                        <th>Expiry Date</th>
+                        <th>Last Updated</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="sku in brandSkus" :key="sku.id">
+                        <td>{{ sku.skuCode }}</td>
+                        <td>{{ sku.skuName }}</td>
+                        <td>{{ sku.totalQuantity || 0 }}</td>
+                        <td>{{ formatDate(sku.earliestExpiry) || '-' }}</td>
+                        <td>{{ formatDate(sku.lastUpdated) || '-' }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </td>
+            </tr>
+
+          </template>
         </tbody>
       </table>
+
 
       <div v-if="activeBrand || activeSection" class="filter-info">
         <strong>Filter:</strong>
@@ -153,6 +199,10 @@ export default {
       donutColors: ["#28a745", "#ffc107", "#dc3545"],
       activeBrand: null,
       activeSection: null,
+      salesChartMode: 'default',
+      expandedBrand: null,
+      brandSkus: [],
+      loadingSkus: false,
     };
   },
 
@@ -242,11 +292,40 @@ export default {
         this.loading = false;
       }
     },
+    async toggleBrandDetails(brandName) {
+      if (this.expandedBrand === brandName) {
+        this.expandedBrand = null;
+        this.brandSkus = [];
+        return;
+      }
+
+      this.expandedBrand = brandName;
+      this.loadingSkus = true;
+
+      try {
+        const res = await axios.get(`${import.meta.env.VITE_BACKEND_NODE}/api/brand-skus`, {
+          params: { brandName },
+        });
+        if (res.data.success) {
+          this.brandSkus = res.data.data;
+        } else {
+          this.brandSkus = [];
+        }
+      } catch (err) {
+        console.error('Error fetching SKUs:', err);
+        this.brandSkus = [];
+      } finally {
+        this.loadingSkus = false;
+      }
+    },
 
     formatDate(dateStr) {
+      if (!dateStr || dateStr === '0000-00-00' || dateStr === 'Invalid Date') return '-';
       const date = new Date(dateStr);
-      return date.toLocaleDateString('en-GB');
+      if (isNaN(date.getTime())) return '-';
+      return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
     },
+
 
     viewAllSelling() {
       alert("View All Top Selling Products clicked!");
@@ -336,37 +415,66 @@ export default {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      const brands = this.salesData.brands || [];
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      let labels = [];
+      let data = [];
+      let titleText = "Total Units Sales (Last 15 Days)";
+      let yAxisLabel = "Units Sold";
 
-      if (brands.length === 0) {
-        ctx.font = "16px Arial";
-        ctx.fillStyle = "#999";
-        ctx.textAlign = "center";
-        ctx.fillText("No sales data", canvas.width / 2, canvas.height / 2);
-        return;
+      if (this.salesChartMode === 'slowMoving') {
+        labels = this.overview.map(v => v.brandName);
+        data = this.overview.map(v => v.slowMoving || 0);
+        titleText = "Slow Moving SKUs by Brand";
+        yAxisLabel = "Slow Moving Count";
+      } else if (this.salesChartMode === 'expirySoon') {
+        labels = this.overview.map(v => v.brandName);
+        data = this.overview.map(v => v.expirySoon || 0);
+        titleText = "Expiry Soon SKUs by Brand";
+        yAxisLabel = "Expiry Soon Count";
+      } else {
+        // Default: Sales last 15 days
+        const brands = this.salesData.brands || [];
+        if (brands.length === 0) {
+          ctx.font = "16px Arial";
+          ctx.fillStyle = "#999";
+          ctx.textAlign = "center";
+          ctx.fillText("No sales data", canvas.width / 2, canvas.height / 2);
+          return;
+        }
+        labels = brands.map(b => b.brandName);
+        data = brands.map(b => b.totalUnits);
       }
 
-      const labels = brands.map(b => b.brandName);
-      const data = brands.map(b => b.totalUnits);
+      // Clear and draw title
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = "bold 14px Arial";
+      ctx.fillStyle = "#333";
+      ctx.textAlign = "center";
+      ctx.fillText(titleText, canvas.width / 2, 20);
 
       this.barChart = new Chart(ctx, {
         type: "bar",
         data: {
           labels,
-          datasets: [
-            { label: "Sold", data, backgroundColor: "#1E90FF", stack: "stack0" },
-            { label: "Remaining", data: data.map(d => 100 - d), backgroundColor: "#E3F2FD", stack: "stack0" },
-          ],
+          datasets: [{
+            label: yAxisLabel,
+            data,
+            backgroundColor: this.salesChartMode === 'default' ? "#1E90FF" : 
+                            this.salesChartMode === 'slowMoving' ? "#ffc107" : "#dc3545",
+          }],
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { stacked: true },
-            y: { stacked: true, min: 0, max: 10000, ticks: { stepSize: 10 } },
+          plugins: {
+            legend: { display: false },
+            title: { display: false },
           },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { stepSize: 1 }
+            }
+          }
         },
       });
     },
@@ -380,9 +488,22 @@ export default {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
         });
+        return;
+      }
+        if (section === 'slowMoving' || section === 'expirySoon') {
+          if (this.salesChartMode === section) {
+            this.salesChartMode = 'default';
+            this.activeSection = null;
+          } else {
+            this.salesChartMode = section;
+            this.activeSection = section;
+          }
       } else {
         this.activeSection = section;
       }
+        this.$nextTick(() => {
+          this.renderBarChart();
+        });
     },
     resetFilters() { this.activeBrand = null; this.activeSection = null; },
 
@@ -429,6 +550,11 @@ export default {
 }
 .card:hover { 
   transform: translateY(-3px); 
+}
+.card.active {
+  background: #e3f2fd;
+  border: 2px solid #1e90ff;
+  font-weight: bold;
 }
 .chart-container { 
   display: flex; 
@@ -683,4 +809,25 @@ canvas {
 canvas:hover {
   transform: scale(1.02);
 }
+
+/* Table Expended Data */
+.sku-details-row {
+  background: #fafafa;
+}
+.sku-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+.sku-table th,
+.sku-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: center;
+}
+.sku-table th {
+  background: #f3f6fb;
+  font-weight: bold;
+}
+
 </style>

@@ -4,19 +4,16 @@
   </div>
 
   <div class="upload-page">
-    <!-- 📁 File Input -->
     <input type="file" @change="onFileChange" accept=".xlsx,.xls,.csv" />
     <button @click="uploadFile" :disabled="!file || uploading">
       {{ uploading ? "Uploading..." : "Upload" }}
     </button>
 
-    <!-- 🔁 Progress Bar -->
     <div v-if="processing" class="progress-container">
       <div class="progress-bar" :style="{ width: progressPercent + '%' }"></div>
       <span>{{ Math.floor(progressPercent) }}%</span>
     </div>
 
-    <!-- ✅ Real-Time Results -->
     <div v-if="results.length" class="results-container">
       <h3>Results:</h3>
       <table border="1" cellpadding="6">
@@ -25,11 +22,11 @@
             <th>#</th>
             <th>SKU Type</th>
             <th>SKU / Combo SKU</th>
-            <th>Child SKU (if combo)</th>
+            <th>Child SKU</th>
             <th>Old Qty</th>
             <th>Deducted</th>
             <th>New Qty</th>
-            <th>Order ID</th>
+            <!-- <th>Order ID</th> -->
             <th>Status</th>
           </tr>
         </thead>
@@ -51,7 +48,6 @@
       </table>
     </div>
 
-    <!-- ❌ Error Display -->
     <div v-if="error" class="error-message">{{ error }}</div>
   </div>
 </template>
