@@ -57,7 +57,7 @@
       </div>
 
       <!-- Donut Chart -->
-      <div v-if="data" class="chart-container">
+      <div v-if="data" ref="donutSection" class="chart-container">
         <div class="chart-wrapper">
           <div class="chart-main">
             <canvas ref="donutCanvas"></canvas>
@@ -171,12 +171,12 @@ export default {
     },
     cards() {
       return [
-        { label: "Total Inventory", value: this.totalSummary.totalInventory, class: "total", filter: null },
+        { label: "Total Inventory", value: this.totalSummary.totalInventory, class: "total", filter: 'totalInventory' },
         { label: "Slow Moving", value: this.totalSummary.slowMoving, class: "slow", filter: "slowMoving" },
         { label: "Expiry Soon", value: this.totalSummary.expirySoon, class: "expiry", filter: "expirySoon" },
         { label: "Avg Shelf Life", value: `${this.totalSummary.avgShelfLifeDays} days`, class: "shelf", filter: null },
         { label: "Sales Last 6 Months", value: this.totalSummary.salesLast6Months, class: "sales", filter: "salesLast6Months" },
-        { label: "RTO Last 6 Months", value: this.totalSummary.salesLast6Months, class: "sales", filter: "salesLast6Months" },        
+        { label: "Total RTOs", value: this.totalSummary.salesLast6Months, class: "sales", filter: "totalRTOs" },        
       ];
     },
     donutData() {
@@ -372,7 +372,18 @@ export default {
     },
 
     filterByBrand(brand) { this.activeBrand = brand; },
-    filterBySection(section) { this.activeSection = section; },
+    filterBySection(section) {
+      if (section === 'totalInventory') {
+        this.$nextTick(() => {
+          const el = this.$refs.donutSection;
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        });
+      } else {
+        this.activeSection = section;
+      }
+    },
     resetFilters() { this.activeBrand = null; this.activeSection = null; },
 
     generateColors(count) {
