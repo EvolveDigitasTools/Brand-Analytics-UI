@@ -10,6 +10,10 @@
       <span>{{ progressPercent }}%</span>
     </div>
 
+    <div v-if="successMessage" class="success-message">
+      ✅ {{ successMessage }}
+    </div>
+
     <div v-if="results.length" class="results-container">
       <h3>Results:</h3>
       <table border="1" cellpadding="6">
@@ -32,7 +36,9 @@
             <td>{{ r.oldQty ?? "-" }}</td>
             <td>{{ r.deducted ?? "-" }}</td>
             <td>{{ r.newQty ?? "-" }}</td>
-            <td>{{ r.skipped ? `Skipped - ${r.reason}` : r.error ? r.error : "Updated" }}</td>
+             <td :class="{ error: r.error }">
+              {{ r.skipped ? `Skipped - ${r.reason}` : r.error ? `❌ ${r.error}` : "✅ Updated" }}
+            </td>
           </tr>
         </tbody>
       </table>
@@ -48,8 +54,10 @@ export default {
       file: null,
       results: [],
       uploading: false,
+      processing: false,
       progressPercent: 0,
       error: null,
+      successMessage: "",
     };
   },
   methods: {
@@ -57,9 +65,11 @@ export default {
       this.file = e.target.files[0];
       this.results = [];
       this.error = null;
+      this.progressPercent = 0;
+      this.successMessage = "";
     },
 
-    uploadFile() {
+    async uploadFile() {
       if (!this.file) return;
 
       const formData = new FormData();
@@ -68,72 +78,66 @@ export default {
       this.results = [];
       this.progressPercent = 0;
       this.uploading = true;
+      this.processing = true;
       this.error = null;
+      this.successMessage = "";
 
-      fetch(`${import.meta.env.VITE_BACKEND_NODE}/flipkart-sse`, {
-        method: "POST",
-        body: formData,
-      })
-        .then((res) => {
-          if (!res.ok) {
-            throw new Error(`HTTP error! status: ${res.status}`);
-          }
+      try {
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_NODE}/flipkart-sse`, {
+          method: "POST",
+          body: formData,
+        });
 
-          const reader = res.body.getReader();
-          const decoder = new TextDecoder();
+        if (!response.ok) throw new Error(`Server error: ${response.status}`);
 
-          const read = () => {
-            reader.read().then(({ done, value }) => {
-              if (done) {
-                this.uploading = false;
-                return;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split("\n").filter((line) => line.startsWith("data: "));
+
+          for (const line of lines) {
+            try {
+              const json = JSON.parse(line.replace("data: ", ""));
+
+              // 🔹 Update progress
+              if (json.progressPercent !== undefined) {
+                this.progressPercent = json.progressPercent;
               }
 
-              const chunk = decoder.decode(value, { stream: true });
-              const lines = chunk.split("\n").filter(Boolean);
+              // 🔹 Push item updates
+              if (json.uploadedSku || json.comboSku || json.error) {
+                this.results.push(json);
+              }
 
-              lines.forEach((line) => {
-                if (line.startsWith("data:")) {
-                  try {
-                    const obj = JSON.parse(line.replace("data: ", ""));
+              // ✅ Process completed
+              if (json.done) {
+                this.progressPercent = 100;
+                this.uploading = false;
+                this.processing = false;
+                this.successMessage = "All Flipkart inventory data updated successfully!";
+              }
 
-                    if (obj.uploadedSku || obj.error) {
-                      this.results.push(obj);
-                      this.$nextTick(() => {});
-                    }
-
-                    if (obj.progressPercent !== undefined) {
-                      this.progressPercent = obj.progressPercent;
-                    }
-
-                    if (obj.error && !obj.uploadedSku) {
-                      this.results.push({ error: obj.error });
-                    }
-
-                    if (obj.done) {
-                      this.uploading = false;
-                    }
-                  } catch (parseErr) {
-                    this.error = `Parsing error: ${parseErr.message}`;
-                  }
-                }
-              });
-
-              read();
-            }).catch((err) => {
-              this.uploading = false;
-              this.error = `Stream read failed: ${err.message}`;
-              this.results.push({ error: `Stream read failed: ${err.message}` });
-            });
-          };
-
-          read();
-        })
-        .catch((err) => {
-          this.uploading = false;
-          this.error = `Upload failed: ${err.message}`;
-          this.results.push({ error: `Upload failed: ${err.message}` });
-        });
+              // ❌ Fatal error
+              if (json.error && !json.uploadedSku) {
+                this.error = json.error;
+                this.uploading = false;
+                this.processing = false;
+              }
+            } catch (err) {
+              console.warn("JSON parse error:", err.message);
+            }
+          }
+        }
+      } catch (err) {
+        this.uploading = false;
+        this.processing = false;
+        this.error = `Upload failed: ${err.message}`;
+      }
     },
   },
 };
@@ -141,52 +145,40 @@ export default {
 
 <style scoped>
 .flipkart-heading {
-  height: fit-content;
-  width: fit-content;
   margin: 20px 0 20px 100px;
 }
-
 .flipkart-text {
   font-size: 2.125rem !important;
   font-weight: 400;
-  line-height: 1.175;
-  letter-spacing: 0.0073529412em !important;
   font-family: "Roboto", sans-serif;
-  text-transform: none !important;
 }
-
 .upload-page {
   max-width: 1200px;
-  justify-content: center;
-  align-items: center;
   margin: 20px auto;
   padding: 20px;
   background: #fff;
   border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
-
 input {
-  border: 1px solid;
+  border: 1px solid #ccc;
   border-radius: 5px;
   width: 85%;
+  padding: 5px;
 }
-
 button {
   margin: 10px 0 10px 10px;
-  padding: 5px 16px;
-  background: #4CAF50;
+  padding: 6px 16px;
+  background: #4caf50;
   color: white;
   border: none;
   border-radius: 5px;
   cursor: pointer;
 }
-
 button:disabled {
   background: #ccc;
   cursor: not-allowed;
 }
-
 .progress-container {
   margin-top: 10px;
   background: #eee;
@@ -196,13 +188,11 @@ button:disabled {
   width: 100%;
   overflow: hidden;
 }
-
 .progress-bar {
   background: #4caf50;
   height: 100%;
-  transition: width 0.2s ease;
+  transition: width 0.4s ease;
 }
-
 .progress-container span {
   position: absolute;
   top: 0;
@@ -211,30 +201,45 @@ button:disabled {
   font-size: 12px;
   color: #333;
 }
-
 .results-container {
-  margin-top: 10px;
+  margin-top: 20px;
 }
-
 table {
   width: 100%;
-  text-indent: 10px;
+  border-collapse: collapse;
+}
+th,
+td {
+  border: 1px solid #d3cbcb;
+  padding: 6px 10px;
   text-align: left;
 }
-
 thead {
-  background: #ededed;
-  width: 100%;
-  height: 30px;
+  background: #f0f0f0;
 }
-
-table, td, tr {
-  border: 1px solid #d3cbcb;
-}
-
 .error-message {
   color: red;
-  margin-top: 10px;
+  margin-top: 15px;
   font-weight: bold;
+}
+.success-message {
+  color: #28a745;
+  margin-top: 15px;
+  font-weight: bold;
+  text-align: center;
+  animation: fadeIn 0.6s ease;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+td.error {
+  color: red;
 }
 </style>

@@ -14,6 +14,10 @@
       <span>{{ Math.floor(progressPercent) }}%</span>
     </div>
 
+     <div v-if="successMessage" class="success-message">
+      ✅ {{ successMessage }}
+    </div>
+
     <div v-if="results.length" class="results-container">
       <h3>Results:</h3>
       <table border="1" cellpadding="6">
@@ -39,7 +43,7 @@
             <td>{{ r.oldQty ?? "-" }}</td>
             <td>{{ r.deducted ?? "-" }}</td>
             <td>{{ r.newQty ?? "-" }}</td>
-            <td>{{ r.orderId || "-" }}</td>
+            <!-- <td>{{ r.orderId || "-" }}</td> -->
             <td :class="{ error: r.error }">
               {{ r.error ? `❌ ${r.error}` : "✅ Updated" }}
             </td>
@@ -124,6 +128,7 @@ export default {
                 this.progressPercent = 100;
                 this.uploading = false;
                 this.processing = false;
+                this.successMessage = "All orders updated successfully!";
               }
 
               // ❌ Error during processing

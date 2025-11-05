@@ -111,7 +111,7 @@
           <tr>
             <th>Brand Name</th>
             <th>Total SKUs</th>
-            <th>Slow Moving</th>
+            <th @click="fetchSlowMovingSkus" class="clickable-heading">Slow Moving</th>
             <th>Expiry Soon</th>
             <th>Avg Shelf Life (Days)</th>
             <th>Sales (Last 6 Months)</th>
@@ -120,18 +120,20 @@
 
         <tbody>
           <template v-for="(v, i) in filteredOverview" :key="i">
-            <tr
-              @click="toggleBrandDetails(v.brandName)"
-              class="clickable-row"
-            >
+            <tr class="clickable-row">
               <td>{{ v.brandName }}</td>
-              <td>{{ v.totalSkus }}</td>
-              <td>{{ v.slowMoving }}</td>
-              <td>{{ v.expirySoon }}</td>
+              <td @click.stop="toggleBrandDetails(v.brandName, 'all')" class="cell-clickable">
+                {{ v.totalSkus }}
+              </td>
+              <td @click.stop="toggleBrandDetails(v.brandName, 'slow')" class="cell-clickable slow-cell">
+                {{ v.slowMoving }}
+              </td>
+              <td class="cell-clickable">{{ v.expirySoon }}</td>
               <td>{{ v.avgShelfLifeDays ?? '-' }}</td>
               <td>{{ v.salesLast6Months }}</td>
             </tr>
 
+            <!-- Expanded Row -->
             <tr v-if="expandedBrand === v.brandName" class="sku-details-row">
               <td colspan="6">
                 <div v-if="loadingSkus">Loading SKUs...</div>
@@ -141,9 +143,9 @@
                       <tr>
                         <th>SKU Code</th>
                         <th>SKU Name</th>
-                        <th>Quantity</th>
-                        <th>Expiry Date</th>
-                        <th>Last Updated</th>
+                        <th>Total Quantity</th>
+                        <th>Earliest Expiry</th>
+                        <th>Sales (Last 6M)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -152,19 +154,17 @@
                         <td>{{ sku.skuName }}</td>
                         <td>{{ sku.totalQuantity || 0 }}</td>
                         <td>{{ formatDate(sku.earliestExpiry) || '-' }}</td>
-                        <td>{{ formatDate(sku.lastUpdated) || '-' }}</td>
+                        <td>{{ sku.salesLast6Months || 0 }}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
               </td>
             </tr>
-
           </template>
         </tbody>
       </table>
-
-
+      
       <div v-if="activeBrand || activeSection" class="filter-info">
         <strong>Filter:</strong>
         <span v-if="activeBrand">Brand = {{ activeBrand }}</span>
@@ -203,6 +203,7 @@ export default {
       expandedBrand: null,
       brandSkus: [],
       loadingSkus: false,
+      expandedType: null,
     };
   },
 
@@ -318,6 +319,37 @@ export default {
         this.loadingSkus = false;
       }
     },
+    async toggleBrandDetails(brandName, type = 'all') {
+      if (this.expandedBrand === brandName && this.expandedType === type) {
+        this.expandedBrand = null;
+        this.expandedType = null;
+        this.brandSkus = [];
+        return;
+      }
+
+      this.expandedBrand = brandName;
+      this.expandedType = type;
+      this.loadingSkus = true;
+
+      try {
+        let endpoint =
+          type === 'slow'
+            ? `${import.meta.env.VITE_BACKEND_NODE}/api/slow-moving-skus`
+            : `${import.meta.env.VITE_BACKEND_NODE}/api/brand-skus`;
+
+        const res = await axios.get(endpoint, { params: { brandName } });
+        if (res.data.success) {
+          this.brandSkus = res.data.data;
+        } else {
+          this.brandSkus = [];
+        }
+      } catch (err) {
+        console.error("Error fetching SKUs:", err);
+        this.brandSkus = [];
+      } finally {
+        this.loadingSkus = false;
+      }
+    },
 
     formatDate(dateStr) {
       if (!dateStr || dateStr === '0000-00-00' || dateStr === 'Invalid Date') return '-';
@@ -326,10 +358,8 @@ export default {
       return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
     },
 
-
     viewAllSelling() {
       alert("View All Top Selling Products clicked!");
-      
     },
 
     renderDonut() {
@@ -829,5 +859,24 @@ canvas:hover {
   background: #f3f6fb;
   font-weight: bold;
 }
+.clickable-heading {
+  cursor: pointer;
+  color: #1e88e5;
+}
+.clickable-heading:hover {
+  text-decoration: underline;
+}
+.cell-clickable {
+  cursor: pointer;
+  color: #1976d2;
+}
+.cell-clickable:hover {
+  text-decoration: underline;
+}
+.slow-cell {
+  color: #e65100;
+}
+
+
 
 </style>
