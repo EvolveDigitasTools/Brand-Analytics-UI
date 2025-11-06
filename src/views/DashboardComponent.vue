@@ -13,61 +13,95 @@
         </div>
       </div>
 
-      <!-- Sales Last 15 Days by Brand Chart -->
+      <!-- Brand Table -->
+      <table class="overview-table">
+        <thead>
+          <tr>
+            <th>S.N.</th>
+            <th>Vendor Name</th>
+            <th>Total SKUs</th>
+            <th>Slow Moving</th>
+            <th>Expiry Soon</th>
+            <th>Avg Shelf Life (Days)</th>
+            <th>Sales (Last 6 Months)</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <template v-for="(v, i) in filteredOverview" :key="i">
+            <tr class="clickable-row">
+              <td>{{ i + 1 }}</td>
+              <td>{{ v.brandName }}</td>
+              <td @click.stop="toggleBrandDetails(v.brandName, 'all')" class="cell-clickable">
+                {{ v.totalSkus }}
+              </td>
+              <td @click.stop="toggleBrandDetails(v.brandName, 'slow')" class="cell-clickable slow-cell">
+                {{ v.slowMoving }}
+              </td>
+              <td @click.stop="toggleBrandDetails(v.brandName, 'expiry')" class="cell-clickable expiry-cell">
+                {{ v.expirySoon }}
+              </td>
+              <td>{{ v.avgShelfLifeDays ?? '-' }} Days</td>
+              <td>{{ v.salesLast6Months }}</td>
+            </tr>
+
+            <!-- Expanded Row -->
+            <tr v-if="expandedBrand === v.brandName" class="sku-details-row">
+              <td colspan="7">
+                <div v-if="loadingSkus">Loading SKUs...</div>
+                <div v-else>
+                  <table class="sku-table">
+                    <thead>
+                      <tr>
+                        <th>S.N.</th>
+                        <th>SKU Code</th>
+                        <th>Product Title</th>
+                        <th>Current Inventory</th>
+                        <th>Earliest Expiry</th>
+                        <th>Sales (Last 6M)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(sku, j) in brandSkus" :key="sku.id">
+                        <td>{{ j + 1 }}</td>
+                        <td>{{ sku.skuCode }}</td>
+                        <td>{{ sku.skuName }}</td>
+                        <td>{{ sku.totalQuantity || 0 }}</td>
+                        <td>{{ formatDate(sku.earliestExpiry) || '-' }}</td>
+                        <td>{{ sku.salesLast6Months || 0 }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table> 
+      
+      <!-- Bar Chart - Sales Last 15 Days by Brand Chart -->
       <div class="sales-trends">
         <div class="trends-header">
           <div>
-            <h3>{{
-              salesChartMode === 'slowMoving' ? 'Slow Moving SKUs by Brand' :
-              salesChartMode === 'expirySoon' ? 'Expiry Soon SKUs by Brand' :
-              'Total Units Sales (Last 15 Days)'
-            }}</h3>
-            <div class="total-amount">
-              {{ 
-                salesChartMode === 'slowMoving' ? totalSummary.slowMoving :
-                salesChartMode === 'expirySoon' ? totalSummary.expirySoon :
-                salesData.totalUnits 
-              }}
-            </div>
+            <h3>Total Units Sales (Last 15 Days)</h3>
+            <div class="total-amount">{{salesData.totalUnits }}</div>
           </div>
         </div>
 
         <div class="chart-wrapper">
-          <canvas :key="'bar-' + salesData.brands.length" ref="barChartCanvas" width="600" height="300"></canvas>
+          <canvas ref="barChartCanvas" width="600" height="300"></canvas>
         </div>
       </div>
 
-      <!-- Top 10 Selling Products (Last 30 Days) -->
-      <div class="top-selling">
-        <div class="top-selling-header">
-          <h3><strong>Top 10 Selling Products (Last 30 Days)</strong></h3>
-        </div>
-
-        <div class="top-selling-list">
-          <div v-for="(item, i) in visibleTopSelling" :key="i" class="selling-item">
-            <div class="selling-sku-date">
-              <div class="sku">{{ item.skuCode }}</div>
-              <div class="date">{{ formatDate(item.date) }}</div>
-            </div>
-            <div class="selling-name">{{ item.productName }}</div>
-            <div class="selling-qty" 
-                :class="{ positive: item.soldQty > 0, negative: item.soldQty < 0 }"
-              >
-                <span v-if="item.soldQty > 0" class="mdi mdi-finance"></span>
-                {{ item.soldQty }}
-            </div>
-          </div>
-        </div>
-
-        <div class="view-all" v-if="topSelling.length > 5">
-          <a href="#" @click.prevent="showAllTopSelling = !showAllTopSelling">
-            {{ showAllTopSelling ? 'View Less' : 'View All' }}
-          </a>
-        </div>
-      </div>
-
-      <!-- Donut Chart -->
-      <div v-if="data" ref="donutSection" class="chart-container">
+      <!-- Donut Chart - Total Inventory -->
+      <div 
+        v-if="data" 
+        ref="donutSection" 
+        class="chart-container"
+        :key="data.totalInventory"
+        @vue:mounted="renderDonut"
+        @vue:updated="renderDonut"
+      >
         <div class="chart-wrapper">
           <div class="chart-main">
             <canvas ref="donutCanvas"></canvas>
@@ -105,66 +139,38 @@
         </div>
       </div>
 
-      <!-- Brand Table -->
-      <table class="overview-table">
-        <thead>
-          <tr>
-            <th>Brand Name</th>
-            <th>Total SKUs</th>
-            <th @click="fetchSlowMovingSkus" class="clickable-heading">Slow Moving</th>
-            <th>Expiry Soon</th>
-            <th>Avg Shelf Life (Days)</th>
-            <th>Sales (Last 6 Months)</th>
-          </tr>
-        </thead>
+      <!-- Top 10 Selling Products (Last 30 Days) -->
+      <div class="top-selling">
+        <div class="top-selling-header">
+          <h3><strong>Top 10 Selling Products (Last 30 Days)</strong></h3>
+        </div>
 
-        <tbody>
-          <template v-for="(v, i) in filteredOverview" :key="i">
-            <tr class="clickable-row">
-              <td>{{ v.brandName }}</td>
-              <td @click.stop="toggleBrandDetails(v.brandName, 'all')" class="cell-clickable">
-                {{ v.totalSkus }}
-              </td>
-              <td @click.stop="toggleBrandDetails(v.brandName, 'slow')" class="cell-clickable slow-cell">
-                {{ v.slowMoving }}
-              </td>
-              <td class="cell-clickable">{{ v.expirySoon }}</td>
-              <td>{{ v.avgShelfLifeDays ?? '-' }}</td>
-              <td>{{ v.salesLast6Months }}</td>
-            </tr>
+        <div class="top-selling-list">
+          <div v-for="(item, i) in visibleTopSelling" :key="i" class="selling-item">
+            <div class="sn">{{ i + 1 }}</div>
 
-            <!-- Expanded Row -->
-            <tr v-if="expandedBrand === v.brandName" class="sku-details-row">
-              <td colspan="6">
-                <div v-if="loadingSkus">Loading SKUs...</div>
-                <div v-else>
-                  <table class="sku-table">
-                    <thead>
-                      <tr>
-                        <th>SKU Code</th>
-                        <th>SKU Name</th>
-                        <th>Total Quantity</th>
-                        <th>Earliest Expiry</th>
-                        <th>Sales (Last 6M)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="sku in brandSkus" :key="sku.id">
-                        <td>{{ sku.skuCode }}</td>
-                        <td>{{ sku.skuName }}</td>
-                        <td>{{ sku.totalQuantity || 0 }}</td>
-                        <td>{{ formatDate(sku.earliestExpiry) || '-' }}</td>
-                        <td>{{ sku.salesLast6Months || 0 }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
-      
+            <div class="selling-sku-date">
+              <div class="sku">{{ item.skuCode }}</div>
+              <div class="date">{{ formatDate(item.date) }}</div>
+            </div>
+
+            <div class="selling-name">{{ item.productName }}</div>
+            <div class="selling-qty" 
+                :class="{ positive: item.soldQty > 0, negative: item.soldQty < 0 }"
+              >
+                <span v-if="item.soldQty > 0" class="mdi mdi-finance"></span>
+                {{ item.soldQty }}
+            </div>
+          </div>
+        </div>
+
+        <div class="view-all" v-if="topSelling.length > 5">
+          <a href="#" @click.prevent="showAllTopSelling = !showAllTopSelling">
+            {{ showAllTopSelling ? 'View Less' : 'View All' }}
+          </a>
+        </div>
+      </div>
+
       <div v-if="activeBrand || activeSection" class="filter-info">
         <strong>Filter:</strong>
         <span v-if="activeBrand">Brand = {{ activeBrand }}</span>
@@ -178,7 +184,8 @@
 <script>
 import axios from "axios";
 import { Chart, registerables } from "chart.js";
-Chart.register(...registerables);
+import zoomPlugin from "chartjs-plugin-zoom";
+Chart.register(...registerables, zoomPlugin);
 
 export default {
   name: "InventoryOverview",
@@ -204,21 +211,32 @@ export default {
       brandSkus: [],
       loadingSkus: false,
       expandedType: null,
+      totalRTO: 0,
     };
   },
-
   computed: {
     totalSummary() {
       if (!this.overview.length) return {};
+
       const sum = this.overview.reduce((a, v) => ({
         totalInventory: a.totalInventory + (v.totalInventory || 0),
         slowMoving: a.slowMoving + (v.slowMoving || 0),
         expirySoon: a.expirySoon + (v.expirySoon || 0),
         avgShelfLifeDays: a.avgShelfLifeDays + (v.avgShelfLifeDays || 0),
         salesLast6Months: a.salesLast6Months + (v.salesLast6Months || 0),
-      }), { totalInventory: 0, slowMoving: 0, expirySoon: 0, avgShelfLifeDays: 0, salesLast6Months: 0 });
+      }), { 
+        totalInventory: 0, 
+        slowMoving: 0, 
+        expirySoon: 0, 
+        avgShelfLifeDays: 0, 
+        salesLast6Months: 0 
+      });
+
       const n = this.overview.length;
-      return { ...sum, avgShelfLifeDays: Math.round(sum.avgShelfLifeDays / n) };
+      return { 
+        ...sum, 
+        avgShelfLifeDays: Math.round(sum.avgShelfLifeDays / n) 
+      };
     },
     cards() {
       return [
@@ -227,7 +245,7 @@ export default {
         { label: "Expiry Soon", value: this.totalSummary.expirySoon, class: "expiry", filter: "expirySoon" },
         { label: "Avg Shelf Life", value: `${this.totalSummary.avgShelfLifeDays} days`, class: "shelf", filter: null },
         { label: "Sales Last 6 Months", value: this.totalSummary.salesLast6Months, class: "sales", filter: "salesLast6Months" },
-        { label: "Total RTOs", value: this.totalSummary.salesLast6Months, class: "sales", filter: "totalRTOs" },        
+        { label: "Total RTOs", value: this.totalRTO || 0, class: "rto", filter: "totalRTOs" },
       ];
     },
     donutData() {
@@ -257,28 +275,41 @@ export default {
       return vendors.filter(v => v && v.inventoryCount > 0);
     },
   },
+  watch: {
+    salesData: {
+      handler(newVal) {
+        if (newVal && newVal.brands) {
+          this.$nextTick(() => this.renderBarChart());
+        }
+      },
+      deep: true,
+      immediate: true
+    },
+    activeBrand() {
+      this.$nextTick(() => this.renderBarChart());
+    },
+    activeSection() {
+      this.$nextTick(() => this.renderBarChart());
+    }
+  },
   mounted() {
     this.loadAllData();
   },
-  updated() {
-    this.$nextTick(() => {
-      if (this.data) this.renderDonut();
-      this.renderBarChart();
-    });
-  },
-
   methods: {
     async loadAllData() {
       this.loading = true;
       try {
-        const [overviewRes, salesRes, sellingRes, vendorRes] = await Promise.all([
+        const [overviewRes, salesRes, sellingRes, vendorRes, rtoTotal] = await Promise.all([
           axios.get(`${import.meta.env.VITE_BACKEND_NODE}/api/overview-inventory`),
           axios.get(`${import.meta.env.VITE_BACKEND_NODE}/api/sales-last-15-days-by-brand`),
           axios.get(`${import.meta.env.VITE_BACKEND_NODE}/api/top-selling`),
-          axios.get(`${import.meta.env.VITE_BACKEND_URL}/inventory/overview`)
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/inventory/overview`),
         ]);
 
-        if (overviewRes.data.success) this.overview = overviewRes.data.data;
+        if (overviewRes.data.success) {
+          this.overview = overviewRes.data.data;
+          this.totalRTO = overviewRes.data.totalRTO || 0;
+        }
         if (salesRes.data.success) this.salesData = salesRes.data.data;
         if (sellingRes.data.success) this.topSelling = sellingRes.data.data.slice(0, 10);
         if (vendorRes.data) {
@@ -293,6 +324,7 @@ export default {
         this.loading = false;
       }
     },
+    //Brand Table - Total SKUs
     async toggleBrandDetails(brandName) {
       if (this.expandedBrand === brandName) {
         this.expandedBrand = null;
@@ -319,6 +351,7 @@ export default {
         this.loadingSkus = false;
       }
     },
+    //Brand Table - Slow Moving and Expiry Soon
     async toggleBrandDetails(brandName, type = 'all') {
       if (this.expandedBrand === brandName && this.expandedType === type) {
         this.expandedBrand = null;
@@ -332,10 +365,14 @@ export default {
       this.loadingSkus = true;
 
       try {
-        let endpoint =
-          type === 'slow'
-            ? `${import.meta.env.VITE_BACKEND_NODE}/api/slow-moving-skus`
-            : `${import.meta.env.VITE_BACKEND_NODE}/api/brand-skus`;
+        let endpoint;
+        if (type === 'slow') {
+          endpoint = `${import.meta.env.VITE_BACKEND_NODE}/api/slow-moving-skus`;
+        } else if (type === 'expiry') {
+          endpoint = `${import.meta.env.VITE_BACKEND_NODE}/api/expiry-soon-skus`;
+        } else {
+          endpoint = `${import.meta.env.VITE_BACKEND_NODE}/api/brand-skus`;
+        }
 
         const res = await axios.get(endpoint, { params: { brandName } });
         if (res.data.success) {
@@ -350,118 +387,111 @@ export default {
         this.loadingSkus = false;
       }
     },
-
     formatDate(dateStr) {
       if (!dateStr || dateStr === '0000-00-00' || dateStr === 'Invalid Date') return '-';
       const date = new Date(dateStr);
       if (isNaN(date.getTime())) return '-';
       return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
     },
-
     viewAllSelling() {
       alert("View All Top Selling Products clicked!");
     },
-
     renderDonut() {
-    if (this.donutChart) this.donutChart.destroy();
-    const canvas = this.$refs.donutCanvas;
-    if (!canvas || !this.data) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+      this.$nextTick(() => {
 
-    const vendors = (this.data.vendorInventory || []).filter(v => v && v.inventoryCount > 0);
-    if (vendors.length === 0) {
-      ctx.font = "16px Arial";
-      ctx.fillStyle = "#999";
-      ctx.textAlign = "center";
-      ctx.fillText("No vendor data", canvas.width / 2, canvas.height / 2);
-      return;
-    }
+        const canvas = this.$refs.donutCanvas;
+        if (!canvas || !this.data) return;
 
-    const labels = this.filteredVendors.map(v => v.vendorName);
-    const data = this.filteredVendors.map(v => v.inventoryCount);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
 
-    if (this.colors.length !== vendors.length) {
-      this.colors = this.generateColors(vendors.length);
-    }
+        if (this.donutChart) {
+          this.donutChart.destroy();
+          this.donutChart = null;
+        }
 
-    this.donutChart = new Chart(ctx, {
-      type: "doughnut",
-      data: {
-        labels,
-        datasets: [{
-          data,
-          backgroundColor: this.colors,
-          borderWidth: 2,
-          hoverBorderWidth: 3,
-          hoverOffset: 10,
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: "75%",
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (context) => `${context.label}: ${context.parsed} items`,
+        const vendors = (this.data.vendorInventory || []).filter(v => v && v.inventoryCount > 0);
+        if (vendors.length === 0) {
+          ctx.font = "16px Arial";
+          ctx.fillStyle = "#999";
+          ctx.textAlign = "center";
+          ctx.fillText("No vendor data", canvas.width / 2, canvas.height / 2);
+          return;
+        }
+
+        const labels = this.filteredVendors.map(v => v.vendorName);
+        const data = this.filteredVendors.map(v => v.inventoryCount);
+
+        if (this.colors.length !== vendors.length) {
+          this.colors = this.generateColors(vendors.length);
+        }
+
+        this.donutChart = new Chart(ctx, {
+          type: "doughnut",
+          data: {
+            labels,
+            datasets: [{
+              data,
+              backgroundColor: this.colors,
+              borderWidth: 2,
+              hoverBorderWidth: 3,
+              hoverOffset: 10,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: "75%",
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: (context) => `${context.label}: ${context.parsed} items`,
+                },
+              },
+            },
+            onClick: (event, elements) => {
+              if (elements.length > 0) {
+                const vendorCode = this.filteredVendors[elements[0].index].vendorCode;
+                this.navigateToVendor(vendorCode);
+              }
             },
           },
-        },
-        onClick: (event, elements) => {
-          if (elements.length > 0) {
-            const vendorCode = this.filteredVendors[elements[0].index].vendorCode;
-            this.navigateToVendor(vendorCode);
-          }
-        },
-      },
-      plugins: [{
-        id: "centerText",
-        beforeDraw: (chart) => {
-          const { ctx, chartArea } = chart;
-          ctx.save();
-          const x = (chartArea.left + chartArea.right) / 2;
-          const y = (chartArea.top + chartArea.bottom) / 2;
+          plugins: [{
+            id: "centerText",
+            beforeDraw: (chart) => {
+              const { ctx, chartArea } = chart;
+              ctx.save();
+              const x = (chartArea.left + chartArea.right) / 2;
+              const y = (chartArea.top + chartArea.bottom) / 2;
 
-          ctx.font = "bold 24px Arial";
-          ctx.fillStyle = "#333";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(this.data.totalInventory, x, y);
+              ctx.font = "bold 24px Arial";
+              ctx.fillStyle = "#333";
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              ctx.fillText(this.data.totalInventory, x, y);
 
-          ctx.font = "14px Arial";
-          ctx.fillText("Total Items", x, y + 30);
-          ctx.restore();
-        },
-      }],
-    });
-  },
-
+              ctx.font = "14px Arial";
+              ctx.fillText("Total Items", x, y + 30);
+              ctx.restore();
+            },
+          }],
+        });
+      });
+    },
     renderBarChart() {
-      if (this.barChart) this.barChart.destroy();
-      const canvas = this.$refs.barChartCanvas;
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      if (this.barChart) {
+        this.barChart.destroy();
+        this.barChart = null;
+      }
 
-      let labels = [];
-      let data = [];
-      let titleText = "Total Units Sales (Last 15 Days)";
-      let yAxisLabel = "Units Sold";
+      this.$nextTick(() => {
+        const canvas = this.$refs.barChartCanvas;
+        if (!canvas) return;
 
-      if (this.salesChartMode === 'slowMoving') {
-        labels = this.overview.map(v => v.brandName);
-        data = this.overview.map(v => v.slowMoving || 0);
-        titleText = "Slow Moving SKUs by Brand";
-        yAxisLabel = "Slow Moving Count";
-      } else if (this.salesChartMode === 'expirySoon') {
-        labels = this.overview.map(v => v.brandName);
-        data = this.overview.map(v => v.expirySoon || 0);
-        titleText = "Expiry Soon SKUs by Brand";
-        yAxisLabel = "Expiry Soon Count";
-      } else {
-        // Default: Sales last 15 days
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
         const brands = this.salesData.brands || [];
         if (brands.length === 0) {
           ctx.font = "16px Arial";
@@ -470,46 +500,75 @@ export default {
           ctx.fillText("No sales data", canvas.width / 2, canvas.height / 2);
           return;
         }
-        labels = brands.map(b => b.brandName);
-        data = brands.map(b => b.totalUnits);
-      }
 
-      // Clear and draw title
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.font = "bold 14px Arial";
-      ctx.fillStyle = "#333";
-      ctx.textAlign = "center";
-      ctx.fillText(titleText, canvas.width / 2, 20);
+        const labels = brands.map(b => b.brandName);
+        const data = brands.map(b => b.totalUnits);
 
-      this.barChart = new Chart(ctx, {
-        type: "bar",
-        data: {
-          labels,
-          datasets: [{
-            label: yAxisLabel,
-            data,
-            backgroundColor: this.salesChartMode === 'default' ? "#1E90FF" : 
-                            this.salesChartMode === 'slowMoving' ? "#ffc107" : "#dc3545",
-          }],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            title: { display: false },
+        this.barChart = new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels,
+            datasets: [
+              {
+                label: "Sold",
+                data,
+                backgroundColor: "rgba(30, 144, 255, 0.3)",
+                borderColor: "#1E90FF",
+                borderWidth: 1,
+              },
+              {
+                type: "line",
+                label: "Sold",
+                data,
+                borderColor: "#1E90FF",
+                borderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                tension: 0.4,
+                fill: false,
+              },
+            ],
           },
-          scales: {
-            y: {
-              beginAtZero: true,
-              ticks: { stepSize: 1 }
-            }
-          }
-        },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: "nearest", intersect: false },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: "#fff",
+                titleColor: "#000",
+                bodyColor: "#000",
+                borderColor: "#ccc",
+                borderWidth: 1,
+                callbacks: {
+                  label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}`,
+                },
+              },
+              zoom: {
+                zoom: {
+                  wheel: { enabled: true },
+                  pinch: { enabled: true },
+                  mode: "x",
+                },
+                pan: { enabled: true, mode: "x" },
+                limits: {
+                  x: { min: 0, max: labels.length - 1 },
+                  y: { min: 0 },
+                },
+              },
+            },
+            scales: {
+              x: { grid: { display: false } },
+              y: { beginAtZero: true, grid: { color: "rgba(0,0,0,0.05)" } },
+            },
+          },
+        });
       });
     },
-
-    filterByBrand(brand) { this.activeBrand = brand; },
+    filterByBrand(brand) { 
+      this.activeBrand = brand; 
+    },
     filterBySection(section) {
       if (section === 'totalInventory') {
         this.$nextTick(() => {
@@ -520,23 +579,16 @@ export default {
         });
         return;
       }
-        if (section === 'slowMoving' || section === 'expirySoon') {
-          if (this.salesChartMode === section) {
-            this.salesChartMode = 'default';
-            this.activeSection = null;
-          } else {
-            this.salesChartMode = section;
-            this.activeSection = section;
-          }
-      } else {
-        this.activeSection = section;
-      }
-        this.$nextTick(() => {
-          this.renderBarChart();
-        });
-    },
-    resetFilters() { this.activeBrand = null; this.activeSection = null; },
 
+      this.activeSection = section;
+      this.$nextTick(() => {
+        this.renderBarChart();
+      });
+    },
+    resetFilters() { 
+      this.activeBrand = null; 
+      this.activeSection = null; 
+    },
     generateColors(count) {
     const colors = [];
     const hueStep = count > 0 ? 360 / count : 0;
@@ -545,7 +597,6 @@ export default {
     }
       return colors;
     },
-
     navigateToVendor(vendorCode) {
       this.$router.push(`/dashboard/inventory/${vendorCode}`);
     },
@@ -612,6 +663,18 @@ export default {
   border: 1px solid #ddd; 
   text-align: center; 
   font-size: 14px; 
+}
+.overview-table th:first-child,
+.overview-table td:first-child,
+.sku-table th:first-child,
+.sku-table td:first-child {
+  width: 60px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.sku-table td:first-child {
+  color: #2e7d32;
 }
 .clickable-row:hover { 
   background: #f3f8ff; 
@@ -705,6 +768,15 @@ export default {
   gap: 0.75rem;
 }
 
+.sn {
+  width: 35px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 1rem;
+  color: #2c3e50;
+  flex-shrink: 0;
+}
+
 .selling-item {
   display: flex;
   justify-content: space-between;
@@ -713,7 +785,12 @@ export default {
   border-bottom: 1px solid #eee;
 }
 
+.selling-item > div {
+  flex: 1;
+}
+
 .selling-sku-date {
+  flex: 1;
   display: flex;
   flex-direction: column;
   font-size: 0.85rem;
@@ -730,12 +807,14 @@ export default {
 }
 
 .selling-name {
-  flex: 1;
+  flex: 2;
   margin-left: 1rem;
   font-weight: 500;
 }
 
 .selling-qty {
+  flex: 0.5;
+  text-align: right;
   font-weight: bold;
   font-size: 1rem;
 }
@@ -836,9 +915,10 @@ canvas {
   transition: transform 0.2s;
 }
 
-canvas:hover {
+/* canvas:hover {
   transform: scale(1.02);
 }
+  /*
 
 /* Table Expended Data */
 .sku-details-row {
@@ -857,7 +937,7 @@ canvas:hover {
 }
 .sku-table th {
   background: #f3f6fb;
-  font-weight: bold;
+
 }
 .clickable-heading {
   cursor: pointer;
@@ -874,9 +954,15 @@ canvas:hover {
   text-decoration: underline;
 }
 .slow-cell {
-  color: #e65100;
+  color: #058f66;
 }
-
-
+.expiry-cell {
+  color: #e65100;
+  font-weight: 600;
+}
+.expiry-cell:hover {
+  text-decoration: underline;
+  color: #d84315;
+}
 
 </style>

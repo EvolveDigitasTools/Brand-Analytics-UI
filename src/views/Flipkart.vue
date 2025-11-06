@@ -104,22 +104,19 @@ export default {
             try {
               const json = JSON.parse(line.replace("data: ", ""));
 
-              // 🔹 Update progress
               if (json.progressPercent !== undefined) {
                 this.progressPercent = json.progressPercent;
               }
 
-              // 🔹 Push item updates
               if (json.uploadedSku || json.comboSku || json.error) {
                 this.results.push(json);
               }
 
-              // ✅ Process completed
               if (json.done) {
                 this.progressPercent = 100;
                 this.uploading = false;
                 this.processing = false;
-                this.successMessage = "All Flipkart inventory data updated successfully!";
+                this.successMessage = "All orders data updated successfully!";
               }
 
               // ❌ Fatal error
