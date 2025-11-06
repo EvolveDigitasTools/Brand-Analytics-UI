@@ -1025,6 +1025,33 @@ td:nth-child(5) {
     word-break: break-word;
 }
 
+:deep(.v-field--variant-filled .v-field__overlay) {
+  background: none !important;
+  opacity: 0.04 !important;
+  transition: opacity 250ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+  border-bottom: none;
+}
+
+:deep(.v-field--variant-filled .v-field__overlay):hover {
+  background: none !important;
+  background-color: none !important;
+  border-bottom: none !important;
+}
+
+.inventory-main_table .table-container tr:nth-child(odd) {
+  background-color: #ffffff !important; /* light gray */
+}
+.inventory-main_table .table-container tr:nth-child(even) {
+  /* background-color: #f2f2f2 !important; white */
+  background-color: #f8f9fa !important;
+}
+
+/* .inventory-main_table .table-container tr:hover {
+  background-color: #ecf8ec !important; /* light blue */
+/* } 
+*/
+
+
 /* sanchit css */
 
 header.inventory-header {
@@ -1058,25 +1085,27 @@ header.inventory-header {
 
 .filter-box .v-field--variant-filled .v-field__overlay {
     opacity: 0 !important;
-        background-color: rgb(66 65 65 / 0%) !important;
+        /* background-color: rgb(66 65 65 / 0%) !important; */
+        background-color: none !important;
 }
 
 .filter-box .v-field--variant-filled .v-field__overlay:hover {
      opacity: 0 !important;
-        background-color: rgb(66 65 65 / 0%) !important;
+        /* background-color: rgb(66 65 65 / 0%) !important; */
+        background-color: none !important;
 }
 
 .filter-box .v-field--variant-filled.v-field--focused .v-field__overlay {
      opacity: 0 !important;
-        background-color: rgb(66 65 65 / 0%) !important;
+        /* background-color: rgb(66 65 65 / 0%) !important; */
+        background-color: none !important;
 }
 
 .filter-box .v-field--variant-filled:hover .v-field__overlay {
      opacity: 0 !important;
-        background-color: rgb(66 65 65 / 0%) !important;
+        /* background-color: rgb(66 65 65 / 0%) !important; */
+        background-color: none !important;
 }
-
-
 
 .top-button-header button{ 
 background: #75bfb0 !important;
@@ -1173,7 +1202,6 @@ background: #75bfb0 !important;
   overflow-x: auto;
   background: #eef1f4;
   border-radius: 10px;
-  padding: 10px;
 }
 
 /* TABLE BASE */
@@ -1448,6 +1476,10 @@ background: #75bfb0 !important;
 .inventory-main_table .table-container tbody tr:hover {
   background-color: #e7f5f1;
   transition: background-color 0.2s ease;
+}
+
+input {
+    border-radius: 5px !important;
 }
 
 /* RESPONSIVE */
