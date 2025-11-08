@@ -7,52 +7,78 @@
     <div v-else class="overview-container">
       <!-- Summary Cards -->
       <div class="overview-cards">
-
-        <!-- <div v-for="card in cards" :key="card.label" class="card" :class="card.class" @click="filterBySection(card.filter)">
+        <div v-for="card in cards" :key="card.label" class="card" :class="card.class" @click="filterBySection(card.filter)">
           <h3>{{ card.label }}</h3>
           <p>{{ card.value }}</p>
-        </div> -->
-
-
-<!-- sanchit code for cards (just added some classes) -->
-        <div
-  v-for="card in cards"
-  :key="card.label"
-  class="card work"
-  :class="card.class"
-  @click="filterBySection(card.filter)"
->
-  <div class="img-section">
-    <!-- Optional SVG or color area (you can customize per card if needed) -->
-    <!-- <svg xmlns="http://www.w3.org/2000/svg" height="50" width="50" viewBox="0 0 76 77">
-      <path fill="#3F9CBB" d="m60.91 71.846 12.314-19.892c3.317-5.36 3.78-13.818-2.31-19.908l-26.36-26.36c-4.457-4.457-12.586-6.843-19.908-2.31L4.753 15.69c-5.4 3.343-6.275 10.854-1.779 15.35a7.773 7.773 0 0 0 7.346 2.035l7.783-1.945a3.947 3.947 0 0 1 3.731 1.033l22.602 22.602c.97.97 1.367 2.4 1.033 3.732l-1.945 7.782a7.775 7.775 0 0 0 2.037 7.349c4.49 4.49 12.003 3.624 15.349-1.782Z"/>
-    </svg> -->
-  </div>
-
-  <div class="card-desc">
-    <div class="card-header">
-      <div class="card-title">{{ card.label }}</div>
-      <div class="card-menu">
-       
-      </div>
-    </div>
-
-    <div class="card-time">{{ card.value }}
-      <svg xmlns="http://www.w3.org/2000/svg" height="48" width="48"><path fill="#fff" d="M4 36V12h24v8h8l8 8v8h-4a4 4 0 1 1-8 0H16a4 4 0 1 1-8 0Zm4-4h24V16H8Zm28 0h8v-6l-6-6h-2Z"/></svg>
-    </div>
-    
-    <!-- <p class="recent">{{ card.subtext || '' }}</p> -->
-  </div>
-</div>
-
-
+        </div>
       </div>
 
-       <!-- both graphs in one row -->
-       <div id="charts_graph">
-      <div class="row">
-      <div class="container">
+      <!-- Brand Table -->
+      <table class="overview-table">
+        <thead>
+          <tr>
+            <th>S.N.</th>
+            <th>Vendor Name</th>
+            <th>Total SKUs</th>
+            <th>Slow Moving</th>
+            <th>Expiry Soon</th>
+            <th>Avg Shelf Life (Days)</th>
+            <th>Sales (Last 6 Months)</th>
+          </tr>
+        </thead>
 
+        <tbody>
+          <template v-for="(v, i) in filteredOverview" :key="i">
+            <tr class="clickable-row">
+              <td>{{ i + 1 }}</td>
+              <td>{{ v.brandName }}</td>
+              <td @click.stop="toggleBrandDetails(v.brandName, 'all')" class="cell-clickable">
+                {{ v.totalSkus }}
+              </td>
+              <td @click.stop="toggleBrandDetails(v.brandName, 'slow')" class="cell-clickable slow-cell">
+                {{ v.slowMoving }}
+              </td>
+              <td @click.stop="toggleBrandDetails(v.brandName, 'expiry')" class="cell-clickable expiry-cell">
+                {{ v.expirySoon }}
+              </td>
+              <td>{{ v.avgShelfLifeDays ?? '-' }} Days</td>
+              <td>{{ v.salesLast6Months }}</td>
+            </tr>
+
+            <!-- Expanded Row -->
+            <tr v-if="expandedBrand === v.brandName" class="sku-details-row">
+              <td colspan="7">
+                <div v-if="loadingSkus">Loading SKUs...</div>
+                <div v-else>
+                  <table class="sku-table">
+                    <thead>
+                      <tr>
+                        <th>S.N.</th>
+                        <th>SKU Code</th>
+                        <th>Product Title</th>
+                        <th>Current Inventory</th>
+                        <th>Earliest Expiry</th>
+                        <th>Sales (Last 6M)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(sku, j) in brandSkus" :key="sku.id">
+                        <td>{{ j + 1 }}</td>
+                        <td>{{ sku.skuCode }}</td>
+                        <td>{{ sku.skuName }}</td>
+                        <td>{{ sku.totalQuantity || 0 }}</td>
+                        <td>{{ formatDate(sku.earliestExpiry) || '-' }}</td>
+                        <td>{{ sku.salesLast6Months || 0 }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table> 
+      
       <!-- Bar Chart - Sales Last 15 Days by Brand Chart -->
       <div class="sales-trends">
         <div class="trends-header">
@@ -77,9 +103,20 @@
         @vue:updated="renderDonut"
       >
         <div class="chart-wrapper">
-         
+          <div class="chart-main">
+            <canvas ref="donutCanvas"></canvas>
+          </div>
           <div class="chart-legend">
-           
+            <div class="total-box">
+              <h3>Total Inventory</h3>
+              <div class="total-value">{{ data.totalInventory }}</div>
+              <router-link 
+                to="/dashboard/inventory"
+                class="view-all-link"
+              >
+                View All Inventory
+              </router-link>
+            </div>
 
             <div class="vendor-list">
               <div 
@@ -99,117 +136,11 @@
               </div>
             </div>
           </div>
-           <div class="chart-main">
-            <canvas ref="donutCanvas"></canvas>
-             <div class="total-box">
-              <!-- <h3>Total Inventory</h3> -->
-              <!-- <div class="total-value">{{ data.totalInventory }}</div> -->
-              <router-link 
-                to="/dashboard/inventory"
-                class="view-all-link"
-              >
-                View All Inventory
-              </router-link>
-            </div>
-          </div>
         </div>
       </div>
-
-      </div>
-      </div>  <!-- both graphs in one row -->
-</div>
-
-      <!-- Brand Table -->
-      <table class="overview-table">
-        <thead>
-          <tr>
-            <th>S.N.</th>
-            <th>Vendor Name</th>
-            <th>Total SKUs</th>
-            <th>Slow Moving</th>
-            <th>Expiry Soon</th>
-            <th>Avg Shelf Life (Days)</th>
-            <th>Sales (Last 6 Months)</th>
-          </tr>
-        </thead>
-
-     <tbody>
-  <template v-for="(v, i) in filteredOverview" :key="i">
-    <tr class="clickable-row">
-      <td>{{ i + 1 }}</td>
-      <td>{{ v.brandName }}</td>
-
-      <!-- Total SKUs: black & bold -->
-      <td
-        @click.stop="toggleBrandDetails(v.brandName, 'all')"
-        class="cell-clickable total-sku"
-      >
-        {{ v.totalSkus }}
-      </td>
-
-      <!-- Slow Moving: green -->
-      <td
-        @click.stop="toggleBrandDetails(v.brandName, 'slow')"
-        class="cell-clickable slow-cell slow-moving"
-      >
-        {{ v.slowMoving }}
-      </td>
-
-      <!-- Expiry Soon: red -->
-      <td
-        @click.stop="toggleBrandDetails(v.brandName, 'expiry')"
-        class="cell-clickable expiry-cell expiry"
-      >
-        {{ v.expirySoon }}
-      </td>
-
-      <td>{{ v.avgShelfLifeDays ?? '-' }} Days</td>
-      <td>{{ v.salesLast6Months }}</td>
-    </tr>
-
-    <!-- Expanded Row -->
-    <tr v-if="expandedBrand === v.brandName" class="sku-details-row">
-      <td colspan="7">
-        <div v-if="loadingSkus">Loading SKUs...</div>
-        <div v-else>
-          <div class="secondary_sku_table">
-          <table class="sku-table">
-            <thead>
-              <tr>
-                <th>S.N.</th>
-                <th>SKU Code</th>
-                <th>Product Title</th>
-                <th>Current Inventory</th>
-                <th>Earliest Expiry</th>
-                <th>Sales (Last 6M)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(sku, j) in brandSkus" :key="sku.id">
-                <td>{{ j + 1 }}</td>
-                <td>{{ sku.skuCode }}</td>
-                <td>{{ sku.skuName }}</td>
-                <td>{{ sku.totalQuantity || 0 }}</td>
-                <td>{{ formatDate(sku.earliestExpiry) || '-' }}</td>
-                <td>{{ sku.salesLast6Months || 0 }}</td>
-              </tr>
-            </tbody>
-          </table>
-          </div>
-        </div>
-      </td>
-    </tr>
-  </template>
-</tbody>
-
-
-
-      </table> 
-      
-     
 
       <!-- Top 10 Selling Products (Last 30 Days) -->
-      <!-- <div class="top-selling">
+      <div class="top-selling">
         <div class="top-selling-header">
           <h3><strong>Top 10 Selling Products (Last 30 Days)</strong></h3>
         </div>
@@ -238,73 +169,7 @@
             {{ showAllTopSelling ? 'View Less' : 'View All' }}
           </a>
         </div>
-      </div> -->
-
-<!-- sanchit code for top 10 selling products -->
-
-<div class="stats-section">
-  <!-- Left Column (Top Selling Table) -->
-  <div class="column left-column">
-    <div class="top-selling">
-      <div class="top-selling-header">
-        <h3><strong>Top 10 Selling Products (Last 30 Days)</strong></h3>
       </div>
-
-      <table class="selling-table">
-        <thead>
-          <tr>
-            <th>S.N.</th>
-            <th>SKU Code</th>
-            <th>Product Name</th>
-            <th>Sold Qty.</th>
-            <th>Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="(item, i) in visibleTopSelling"
-            :key="i"
-            :class="{ 'positive-row': item.soldQty > 0, 'negative-row': item.soldQty < 0 }"
-          >
-            <td>{{ i + 1 }}</td>
-            <td>{{ item.skuCode }}</td>
-            <td>{{ item.productName }}</td>
-            <td class="sold-qty">{{ item.soldQty }}</td>
-            <td>{{ formatDate(item.date) }}</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div class="view-all" v-if="topSelling.length > 5">
-        <a href="#" @click.prevent="showAllTopSelling = !showAllTopSelling">
-          {{ showAllTopSelling ? "View Less" : "View All" }}
-        </a>
-      </div>
-    </div>
-  </div>
-
-  <!-- Right Column (Popular Stocks) -->
-  <div class="column right-column">
-    <div class="popular-stocks">
-      <div class="popular-header">
-        <h3><strong>All Marketplaces</strong></h3>
-      </div>
-
- <!-- Chart Container -->
-    <div class="popular-chart-wrapper">
-      <img src="../../public/Untitled_design__14_-removebg-preview.png" alt="">
-    </div>
-    <div class="pie_labels">
-  <div class="label-item" style="--color: #87CEFA;">Amazon</div>
-  <div class="label-item" style="--color: #4CAF50;">Flipkart</div>
-  <div class="label-item" style="--color: #2196F3;">Meesho</div>
-</div>
-
-    </div>
-  </div>
-</div>
-
-
 
       <div v-if="activeBrand || activeSection" class="filter-info">
         <strong>Filter:</strong>
@@ -740,34 +605,11 @@ export default {
 </script>
 
 <style scoped>
-
-/* Total SKUs: black & bold */
-.total-sku {
-  color: #000 !important;
-  font-weight: 700 !important;
-  font-size: 16px;
-}
-
-/* Slow Moving numbers: green */
-.slow-moving {
-  color: #2e7d32 !important;
-  font-weight: 700 !important;
-  font-size: 16px;
-}
-
-/* Expiry Soon numbers: red */
-.expiry {
-  color: #d32f2f !important;
-  font-weight: 700 !important;
-  font-size: 16px !important;
-}
-
-
 .inventory-overview { 
-  margin: auto;
+  margin: 2rem auto;
   padding: 2rem;
-  background: #ECF0F3;
-  /* border-radius: 12px; */
+  background: white;
+  border-radius: 12px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
 }
 .overview-cards { 
@@ -779,12 +621,12 @@ export default {
 .card { 
   flex: 1; 
   min-width: 180px; 
-  /* background: #f8f9fa; 
-  border-radius: 10px;  */
-  /* padding: 1rem;  */
+  background: #f8f9fa; 
+  border-radius: 10px; 
+  padding: 1rem; 
   text-align: center; 
   cursor: pointer; 
- /* box-shadow: rgba(17, 17, 26, 0.1) 0px 0px 16px; */
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1); 
   transition: 0.2s; 
 }
 .card:hover { 
@@ -796,57 +638,32 @@ export default {
   font-weight: bold;
 }
 .chart-container { 
-   width: 49%;
-  float: right;
-  background: #ecf0f3;
-    border-radius: 20px;
-    box-shadow: 14px 14px 20px #cbced1, -14px -14px 20px #fff;
-    transition: all .3s ease-in-out;
-  /* margin: 10px;  */
+  display: flex; 
+  justify-content: space-around; 
+  align-items: center; 
+  flex-wrap: wrap; 
+  margin: 1.5rem 0; 
 }
 .chart-main { 
-      width: 300px;
-    height: 325px;
-    padding-top: 50px;
-    padding-bottom: 20px;
+  width: 300px; 
+  height: 300px; 
 }
 .chart-legend {
-  width: 325px;
-    padding: 25px;
- 
+  width: 300px;
+  padding: 1rem;
+  border-left: 1px solid #eee;
 }
 .overview-table { 
-  width: 100%;
-  border-collapse: collapse;
-  background: #fff;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  font-family: "Inter", Arial, sans-serif;
-  margin-top: 1.5rem;
+  width: 100%; 
+  border-collapse: collapse; 
+  margin-top: 1rem; 
 }
-
-.overview-table thead {
-  background-color: #5ba89a;
-  color: #fff;
+.overview-table th, .overview-table td { 
+  padding: 0.75rem; 
+  border: 1px solid #ddd; 
+  text-align: center; 
+  font-size: 14px; 
 }
-
-.overview-table th {
-  padding: 12px 16px;
-  font-weight: 600;
-  text-align: left;
-  font-size: 0.95rem;
-  border: 1px solid #e5e5e5;
-}
-
-/* ===== Table Body ===== */
-.overview-table td {
-  padding: 12px 16px;
-  font-size: 0.9rem;
-  border: 1px solid #f0f0f0;
-  color: #333;
-}
-
 .overview-table th:first-child,
 .overview-table td:first-child,
 .sku-table th:first-child,
@@ -856,47 +673,20 @@ export default {
   font-weight: 600;
 }
 
-/* ===== Table Body ===== */
-.overview-table tbody tr:nth-child(odd) {
-  background-color: #ffffff; /* white rows */
-}
-
-.overview-table tbody tr:nth-child(even) {
-  background-color: #f7f9f9; /* light gray rows */
-}
-
 .sku-table td:first-child {
   color: #2e7d32;
 }
 .clickable-row:hover { 
-  background: #5ba89a33 !important; 
+  background: #f3f8ff; 
   cursor: pointer; 
 }
 .sales-trends { 
-  /* margin: 10px;  */
-  width: 49%;
-  float: left;
+  margin: 2rem 0; 
   padding: 1.5rem; 
-  background: #ecf0f3;
-    border-radius: 20px;
-    box-shadow: 14px 14px 20px #cbced1, -14px -14px 20px #fff;
-    
-    
-    transition: all .3s 
-ease-in-out;
+  background: #fff; 
+  border-radius: 12px; 
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
 }
-
-div#charts_graph .row {
-    display: flex;
-        margin: auto;
-    justify-content: space-evenly;
-}
-
-div#charts_graph {
-    padding-top: 20px;
-    padding-bottom: 20px;
-}
-
 .trends-header { 
   display: flex; 
   justify-content: space-between; 
@@ -936,19 +726,19 @@ div#charts_graph {
   display: flex;
   gap: 2rem;
   position: relative;
-  /* background: #fff; */
- /* align-items: center; */
+  background: #fff;
+  border: 1px solid #eee;
   border-radius: 8px;
   overflow: hidden;
 }
-/* 
+
 .top-selling {
   margin: 2rem 0;
   padding: 1.5rem;
   background: #fff;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-} */
+}
 
 .top-selling-header {
   display: flex;
@@ -976,7 +766,6 @@ div#charts_graph {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-      padding: 0px 20px;
 }
 
 .sn {
@@ -988,13 +777,13 @@ div#charts_graph {
   flex-shrink: 0;
 }
 
-/* .selling-item {
+.selling-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 0;
   border-bottom: 1px solid #eee;
-} */
+}
 
 .selling-item > div {
   flex: 1;
@@ -1017,11 +806,11 @@ div#charts_graph {
   font-size: 0.8rem;
 }
 
-/* .selling-name {
+.selling-name {
   flex: 2;
   margin-left: 1rem;
   font-weight: 500;
-} */
+}
 
 .selling-qty {
   flex: 0.5;
@@ -1035,19 +824,17 @@ div#charts_graph {
 
 .view-all {
   text-align: center;
-  margin-top: 30px;
+  margin-top: 1rem;
 }
 
-/* .view-all a {
+.view-all a {
   color: #1a73e8;
   text-decoration: none;
   font-weight: 500;
-} */
+}
 
 .view-all a:hover {
-  background-color: #606060;
-    color: white;
-    transform: translateY(-2px);
+  text-decoration: underline;
 }
 
 .total-value {
@@ -1058,28 +845,22 @@ div#charts_graph {
 }
 
 .view-all-link {
-      background: #75bfb0;
-    border: none;
-    border-radius: 40px;
-    box-shadow: 6px 6px 6px #cbced1, -6px -6px 6px #fff;
-    color: #fff;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 700;
-    /* height: 50px !important; */
-    transition: .3s;
-    padding: 15px 30px;
+  display: inline-block;
+  color: #3498db;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border: 1px solid #3498db;
+  border-radius: 4px;
+  transition: all 0.3s ease;
 }
 
 .view-all-link:hover {
-  background-color: #606060;
+  background-color: #3498db;
   color: white;
-  /* transition: all .25s ease; */
-  transform: translateY(-2px);
 }
 
 .vendor-list {
-  max-height: 398px;
+  max-height: 300px;
   overflow-y: auto;
 }
 
@@ -1140,56 +921,24 @@ canvas {
   /*
 
 /* Table Expended Data */
-/* ===== SKU Table (Expanded Rows) ===== */
+.sku-details-row {
+  background: #fafafa;
+}
 .sku-table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 10px;
-  background: #fff;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-  font-family: "Inter", Arial, sans-serif;
 }
-
-/* Header styling */
-.sku-table thead {
-  background-color: #5ba89a !important; /* same as overview header */
-  color: #fff;
-}
-
-.sku-table th {
-  padding: 12px 16px;
-  text-align: left;
-  font-weight: 600;
-  font-size: 0.9rem;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-/* Alternating row colors */
-.sku-table tbody tr:nth-child(odd) {
-  background-color: #ffffff; /* white */
-}
-
-.sku-table tbody tr:nth-child(even) {
-  background-color: #f7f9f9; /* light gray */
-}
-
-/* Table cells */
+.sku-table th,
 .sku-table td {
-  padding: 12px 16px;
-  text-align: left;
-  border-bottom: 1px solid #e0e0e0;
-  font-size: 0.9rem;
-  color: #333;
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: center;
 }
+.sku-table th {
+  background: #f3f6fb;
 
-/* Hover effect */
-.sku-table tbody tr:hover {
-  background-color: #eef6f5; /* subtle hover highlight */
-  transition: 0.2s ease;
 }
-
 .clickable-heading {
   cursor: pointer;
   color: #1e88e5;
@@ -1214,548 +963,6 @@ canvas {
 .expiry-cell:hover {
   text-decoration: underline;
   color: #d84315;
-}
-
-
-/* sanchit css */
-
-/* ============ Uiverse-inspired Cards Integration ============ */
-.overview-cards {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.5rem;
-  margin: 2rem 0;
-  justify-content: space-between;
-}
-
-.card.work {
-  --primary-clr: #1C204B;
-  --dot-clr: #BBC0FF;
-  --play: hsl(195, 74%, 62%);
-  width: 200px;
-  height: 170px;
-  border-radius: 10px;
-  font-family: "Arial", sans-serif;
-  color: #fff;
-  display: grid;
-  grid-template-rows: 50px 1fr;
-  cursor: pointer;
-  transition: all 0.25s ease-in-out;
-}
-
-.card.work:hover .img-section {
-  transform: translateY(1em);
-}
-
-.card-desc {
-  border-radius: 10px;
-  padding: 15px;
-  position: relative;
-  top: -10px;
-  display: grid;
-  gap: 10px;
-  background: hsl(168deg 3.08% 39.96%);
-}
-
-.card-time {
-    font-size: 20px;
-    display: flex;
-    font-weight: 600;
-    justify-content: space-between;
-   color: #fff;
-    align-items: center;
-}
-
-.img-section {
-  transition: 0.3s ease;
-  border-top-left-radius: 10px;
-  border-top-right-radius: 10px;
-  background: #75bfb0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 70px;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-}
-
-.card-title {
-  font-size: 16px;
-  color: #fff;
-  font-weight: 500;
-}
-
-/* .card-menu {
-  display: flex;
-  gap: 4px;
-} */
-
-.dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--dot-clr);
-}
-/* 
-.recent {
-  line-height: 1;
-  font-size: 0.8em;
-  color: #d0d2ff;
-} */
-
-/* Responsive adjustments */
-@media (max-width: 1100px) {
-  .overview-cards {
-    justify-content: center;
-  }
-  .card.work {
-    width: 45%;
-  }
-}
-@media (max-width: 700px) {
-  .card.work {
-    width: 100%;
-  }
-}
-
-.total-box {
-    text-align: center;
-    padding: 50px 0px 50px 0px;
-    width: 100%;
-}
-
-
-.overview-table tr:last-child td {
-  border-bottom: none;
-}
-
-/* Hover + Clickable Rows */
-
-
-.cell-clickable {
-  color: #2d8a7a;
-  cursor: pointer;
-  font-weight: 500;
-  transition: color 0.2s ease;
-}
-
-.cell-clickable:hover {
-  color: #1c5c50;
-  text-decoration: underline;
-}
-
-/* Special color accents */
-.slow-cell {
-  color: #d97706;
-}
-
-.expiry-cell {
-  color: #e11d48;
-}
-
-/* ===== Expanded SKU Details Table ===== */
-.sku-details-row {
-  background-color: #f9fbfa;
-}
-
-.sku-details-row td {
-  padding: 0;
-}
-
-.sku-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: #ffffff;
-  margin: 20px 0;
-  border-radius: 8px;
-  box-shadow: 0 1px 5px rgba(0,0,0,0.05);
-  overflow: hidden;
-}
-
-/* .sku-table thead {
-  background-color: #e6f4f1;
-} */
-
-.sku-table th {
-  padding: 10px 14px;
-  text-align: left;
-  font-size: 0.9rem;
-  color: #3a3a3a;
-}
-
-.sku-table td {
-  padding: 10px 14px;
-  border-bottom: 1px solid #f1f1f1;
-  font-size: 0.85rem;
-}
-
-.sku-table tr:hover {
-  background-color: #f8fcfb;
-}
-
-/* ===== Responsive ===== */
-@media (max-width: 900px) {
-  .overview-table th, .overview-table td {
-    padding: 10px;
-    font-size: 0.85rem;
-  }
-}
-
-.secondary_sku_table thead tr {
-    background: #5ba89a !important;
-}
-.secondary_sku_table thead tr th {
-    color: #fff !important;
-}
-.secondary_sku_table {
-    width: 90%;
-    margin: auto;
-    padding-top: 20px;
-    padding-bottom: 20px;
-}
-
-
-/* last section css */
-
-.stats-section {
-  display: flex;
-  gap: 20px;
-  margin-top: 40px;
-  margin-bottom: 40px;
-}
-
-.column {
-  flex: 1;
-}
-
-/* ----- Left Column (Top Selling) ----- */
-.top-selling {
-  background: #ecf0f3;
-    border-radius: 20px;
-    box-shadow: 14px 14px 20px #cbced1, -14px -14px 20px #fff;
-    transition: all .3s 
-ease-in-out;
-  padding: 30px;
-}
-
-.top-selling-header h3 {
-  margin-bottom: 12px;
-  color: #333;
-}
-
-.selling-item {
-  display: grid;
-  grid-template-columns: 65px 1fr 1.5fr 120px;
-  align-items: center;
-  border-bottom: 1px solid #eee;
-  padding: 8px 0;
-}
-
-.selling-item:last-child {
-  border-bottom: none;
-}
-
-.sku {
-  font-weight: 600;
-  color: #5ba89a;
-  font-size: 17px;
-}
-
-.date {
-  color: #888;
-  font-size: 0.85rem;
-}
-
-.selling-name {
-  font-size: 16px;
-  color: #333;
-}
-
-.selling-qty {
-  text-align: right;
-  font-weight: 600;
-}
-
-.selling-qty.positive {
-  color: #28a745;
-}
-
-.selling-qty.negative {
-  color: #dc3545;
-}
-
-/* .view-all {
-  text-align: center;
-  margin-top: 10px;
-} */
-
-.view-all a {
-  background: #75bfb0;
-    border: none;
-    border-radius: 40px;
-    box-shadow: 6px 6px 6px #cbced1, -6px -6px 6px #fff;
-    color: #fff;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 700;
-   text-decoration: none !important;
-   
-    transition: .3s;
-    padding: 15px 30px;
-}
-
-/* ----- Right Column (Popular Stocks) ----- */
-.popular-stocks {
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-  padding: 16px;
-}
-
-.popular-header h3 {
-  margin-bottom: 12px;
-      text-align: center;
-  color: #333;
-}
-
-.stock-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #eee;
-  padding: 8px 0;
-}
-
-.stock-item:last-child {
-  border-bottom: none;
-}
-
-.stock-name {
-  font-weight: 500;
-  color: #444;
-}
-
-.stock-value {
-  color: #007bff;
-  font-weight: 600;
-}
-
-.stock-change.up {
-  color: #28a745;
-  font-weight: 600;
-}
-
-.stock-change.down {
-  color: #dc3545;
-  font-weight: 600;
-}
-
-
-/* Layout */
-/* .stats-section {
-  display: flex;
-  gap: 20px;
-  margin-top: 30px;
-} */
-
-.left-column {
-  flex: 0.7; /* 70% width */
-}
-
-.right-column {
-  flex: 0.3; /* 30% width */
-}
-
-/* ====== Top Selling Table ====== */
-.selling-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: #fff;
-  border-radius: 10px;
-  overflow: hidden;
-  font-family: "Inter", Arial, sans-serif;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-}
-
-.selling-table thead {
-  background-color: #5ba89a;
-  color: #fff;
-}
-
-.selling-table th,
-.selling-table td {
-  padding: 12px 16px;
-  text-align: left;
-  font-size: 0.9rem;
-  border: 1px solid #e5e5e5;
-}
-
-.selling-table th:first-child,
-.selling-table td:first-child {
-  text-align: center;
-  width: 60px;
-  font-weight: 600;
-}
-
-.selling-table tbody tr:nth-child(odd) {
-  background-color: #ffffff;
-}
-
-.selling-table tbody tr:nth-child(even) {
-  background-color: #f7f9f9;
-}
-
-.selling-table tbody tr:hover {
-  background-color: #eef6f5;
-  transition: 0.2s ease;
-}
-
-.sold-qty {
-  font-weight: 600;
-  text-align: center;
-}
-
-.positive-row .sold-qty {
-  color: #2e7d32;
-}
-
-.negative-row .sold-qty {
-  color: #d32f2f;
-}
-
-/* ====== Popular Stocks ====== */
-.popular-stocks {
-  background: #ecf0f3;
-    border-radius: 20px;
-    box-shadow: 14px 14px 20px #cbced1, -14px -14px 20px #fff;
-    transition: all .3s ease-in-out;
-    padding: 30px;
-}
-
-.popular-header h3 {
-  margin: 0;
-  font-size: 1.1rem;
-  color: #333;
-}
-
-.stock-list {
-  margin-top: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.stock-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.6rem 0;
-  border-bottom: 1px solid #eee;
-}
-
-.stock-item:last-child {
-  border-bottom: none;
-}
-
-.stock-rank {
-  font-weight: bold;
-  color: #5ba89a;
-  margin-right: 10px;
-}
-
-.stock-details {
-  flex: 1;
-}
-
-.stock-name {
-  font-weight: 500;
-  color: #333;
-}
-
-.stock-value {
-  font-size: 0.9rem;
-  color: #666;
-}
-
-.stock-change {
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.stock-change.up {
-  color: #2e7d32;
-}
-
-.stock-change.down {
-  color: #d32f2f;
-}
-
-/* Make "Sold Qty" column wider */
-.selling-table th:nth-child(4),
-.selling-table td:nth-child(4) {
-  width: 120px;   /* adjust as needed (e.g., 100–140px) */
-  text-align: center;
-  white-space: nowrap; /* prevent text wrapping */
-}
-
-
-/* ====== View All Link ====== */
-/* .view-all {
-  text-align: center;
-  margin-top: 1rem;
-} */
-
-/* .view-all a {
-  color: #1a73e8;
-  text-decoration: none;
-  font-weight: 500;
-} */
-
-/* .view-all a:hover {
-  text-decoration: underline;
-} */
-
-
-.popular-chart-wrapper {
-  margin: auto;
-  padding: 30px;
-  min-height: 400px;
-}
-
-.pie_labels {
-  display: inline-flex;  
-  align-items: flex-start;
-  padding: 10px 0;
-  font-family: "Segoe UI", Arial, sans-serif;
-  font-size: 15px;
-  color: #333;
-      margin-left: 50px;
-}
-
-.label-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: center;
-  text-align: center;
-  margin-right: 20px;
-  margin-bottom: 6px;
-  font-weight: 500;
-}
-
-.label-item::before {
-  content: "";
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background-color: var(--color);
-  box-shadow: 0 0 3px rgba(0,0,0,0.2);
 }
 
 </style>
