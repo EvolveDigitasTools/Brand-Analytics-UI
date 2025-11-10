@@ -8,6 +8,9 @@
     <div v-if="uploading" class="progress-container">
       <div class="progress-bar" :style="{ width: progressPercent + '%' }"></div>
       <span>{{ progressPercent }}%</span>
+      <div v-if="progressPercent === 100 && !uploading && !error" style="color: green; font-weight: bold; margin-top: 10px;">
+        ✅ All orders processed successfully!
+      </div>
     </div>
 
     <div v-if="results.length" class="results-container">
@@ -18,7 +21,7 @@
             <th>#</th>
             <th>SKU Code</th>
             <!-- <th>Reason</th> -->
-            <th>Child SKU</th>
+            <th>Child/Group SKU</th>
             <th>Old Qty</th>
             <th>Deducted</th>
             <th>New Qty</th>
@@ -30,7 +33,19 @@
             <td>{{ index + 1 }}</td>
             <td>{{ r.uploadedSku || r.comboSku || r.groupSku || r.skuCode || "-" }}</td>
             <!-- <td>{{ r.reason ?? "-" }}</td> -->
-            <td>{{ r.childSku ? r.childSku : (r.type === "normal-with-group" ? "-" : "") }}</td>
+            <!-- <td>{{ r.childSku ? r.childSku : (r.type === "normal-with-group" ? "-" : "") }}</td> -->
+            <td>
+              <span v-if="r.childSku && r.deductedSku">
+                {{ r.childSku }} / {{ r.deductedSku }}
+              </span>
+              <span v-else-if="r.childSku">
+                {{ r.childSku }}
+              </span>
+              <span v-else-if="r.deductedSku">
+                {{ r.deductedSku }}
+              </span>
+              <span v-else>-</span>
+            </td>
             <td>{{ r.oldQty ?? "-" }}</td>
             <td>{{ r.deducted ?? "-" }}</td>
             <td>{{ r.newQty ?? "-" }}</td>
@@ -112,7 +127,14 @@ export default {
                       this.results.push({ error: obj.error });
                     }
                     if (obj.done) {
+                    requestAnimationFrame(() => {
+                      this.progressPercent = 100;
                       this.uploading = false;
+
+                      setTimeout(() => {
+                        this.success = true;
+                      }, 200);
+                    });
                     }
                   } catch (parseErr) {
                     // console.error("Error parsing SSE data:", parseErr, line);
