@@ -4,17 +4,17 @@
         <div class="mrkt-btn">
             <div class="sheet-btn">
                 <!-- Button to go to Meesho component -->
-                <button @click="goToMeesho">Meesho</button>
+                <button class="button2" @click="goToMeesho">Meesho</button>
             </div>
 
             <div class="sheet-btn">
                 <!-- Button to go to Meesho component -->
-                <button @click="goToAmazon">Amazon</button>
+                <button class="button2" @click="goToAmazon">Amazon</button>
             </div>
 
             <div class="sheet-btn">
                 <!-- Button to go to Meesho component -->
-                <button @click="goToFlipkart">Flipkart</button>
+                <button class="button2" @click="goToFlipkart">Flipkart</button>
             </div>
         </div>
 
@@ -39,15 +39,16 @@ export default {
 </script>
 
 <style scoped>
-.marketplaces-heading {
-    height: fit-content;
-    width: fit-content;
-    margin: 20px 0 20px 100px;
+.dashboard-layout {
+      background-color: #F0F3F5 !important;
 }
 
-.marketplaces-text {
+.marketplaces-heading h4 {
     font-size: 2.125rem !important;
     font-weight: 400;
+    text-align: center !important;
+    padding-top: 50px;
+    padding-bottom: 30px;
     line-height: 1.175;
     letter-spacing: 0.0073529412em !important;
     font-family: "Roboto", sans-serif;
@@ -68,25 +69,73 @@ export default {
   border-radius: 8px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
-button {
+/* marketplace button */ 
+.button2 {
+  display: inline-block;
+  transition: all 0.2s ease-in;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
   color: #090909;
+      margin: 30px;
   padding: 0.7em 1.7em;
+  cursor: pointer;
   font-size: 18px;
   border-radius: 0.5em;
   background: #e8e8e8;
-  cursor: pointer;
   border: 1px solid #e8e8e8;
-  transition: all 0.3s;
   box-shadow: 6px 6px 12px #c5c5c5, -6px -6px 12px #ffffff;
 }
-button:hover{
-    background: #e8e8e8;
-    transform: translate(-0.25rem, -0.25rem);
-    background: var(--hover-bg);
-    box-shadow: 0.25rem 0.25rem var(--bg);
-}
-button:active {
+
+.button2:active {
   color: #666;
   box-shadow: inset 4px 4px 12px #c5c5c5, inset -4px -4px 12px #ffffff;
+}
+
+.button2:before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%) scaleY(1) scaleX(1.25);
+  top: 100%;
+  width: 140%;
+  height: 180%;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 50%;
+  display: block;
+  transition: all 0.5s 0.1s cubic-bezier(0.55, 0, 0.1, 1);
+  z-index: -1;
+}
+
+.button2:after {
+  content: "";
+  position: absolute;
+  left: 55%;
+  transform: translateX(-50%) scaleY(1) scaleX(1.45);
+  top: 180%;
+  width: 160%;
+  height: 190%;
+  background-color: #009087;
+  border-radius: 50%;
+  display: block;
+  transition: all 0.5s 0.1s cubic-bezier(0.55, 0, 0.1, 1);
+  z-index: -1;
+}
+
+.button2:hover {
+  color: #ffffff;
+  border: 1px solid #009087;
+}
+
+.button2:hover:before {
+  top: -35%;
+  background-color: #009087;
+  transform: translateX(-50%) scaleY(1.3) scaleX(0.8);
+}
+
+.button2:hover:after {
+  top: -45%;
+  background-color: #009087;
+  transform: translateX(-50%) scaleY(1.3) scaleX(0.8);
 }
 </style>
