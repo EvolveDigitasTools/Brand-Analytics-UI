@@ -15,7 +15,7 @@
     </div>
 
      <div v-if="successMessage" class="success-message">
-      ✅ {{ successMessage }}
+      {{ successMessage }}
     </div>
 
     <div v-if="results.length" class="results-container">
@@ -23,7 +23,7 @@
       <table border="1" cellpadding="6">
         <thead>
           <tr>
-            <th>#</th>
+            <th>S.N.</th>
             <th>SKU Type</th>
             <th>SKU / Combo SKU</th>
             <th>Child SKU</th>
@@ -44,9 +44,22 @@
             <td>{{ r.deducted ?? "-" }}</td>
             <td>{{ r.newQty ?? "-" }}</td>
             <!-- <td>{{ r.orderId || "-" }}</td> -->
-            <td :class="{ error: r.error }">
+            <!-- <td :class="{ error: r.error }">
               {{ r.error ? `❌ ${r.error}` : "✅ Updated" }}
-            </td>
+            </td> -->
+            <td :class="{ error: r.error }">
+            <!-- Already processed -->
+            <span v-if="r.error?.includes('already processed')">⚠️ Already processed</span>
+
+            <!-- No inventory -->
+            <span v-else-if="r.error?.includes('No inventory')">❌ No inventory</span>
+
+            <!-- Generic error -->
+            <span v-else-if="r.error">❌ {{ r.error }}</span>
+
+            <!-- Successful update -->
+            <span v-else>✅ Updated</span>
+          </td>
           </tr>
         </tbody>
       </table>
@@ -63,17 +76,24 @@ export default {
       file: null,
       results: [],
       uploading: false,
+      processing: false,
       progressPercent: 0,
       error: null,
-      processing: false,
+      successMessage: null,
     };
   },
+
   methods: {
     onFileChange(e) {
       this.file = e.target.files[0];
+
+      // RESET UI COMPLETELY
       this.results = [];
       this.error = null;
+      this.successMessage = null;
       this.progressPercent = 0;
+      this.uploading = false;
+      this.processing = false;
     },
 
     async uploadFile() {
@@ -82,8 +102,8 @@ export default {
       this.uploading = true;
       this.processing = true;
       this.results = [];
-      this.progressPercent = 0;
       this.error = null;
+      this.successMessage = null;
 
       const formData = new FormData();
       formData.append("file", this.file);
@@ -101,36 +121,34 @@ export default {
 
         while (true) {
           const { done, value } = await reader.read();
-          if (done) {
-            break;
-          }
+          if (done) break;
 
           const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n\n").filter((l) => l.startsWith("data: "));
+          const lines = chunk.split("\n\n").filter(l => l.startsWith("data: "));
 
           for (const line of lines) {
             try {
               const json = JSON.parse(line.replace("data: ", ""));
 
-              // 🧩 Real-time percentage updates
+              // ⏳ Progress update
               if (json.progressPercent !== undefined) {
                 this.progressPercent = json.progressPercent;
               }
 
-              // 📦 SKU status messages
+              // 📝 Append result rows
               if (json.originalSku || json.comboSku || json.error) {
                 this.results.push(json);
               }
 
-              // ✅ Processing finished
+              // ✅ Completed
               if (json.done) {
                 this.progressPercent = 100;
                 this.uploading = false;
                 this.processing = false;
-                this.successMessage = "All orders updated successfully!";
+                this.successMessage = json.message || "All orders updated successfully!";
               }
 
-              // ❌ Error during processing
+              // ❌ Global error
               if (json.error && !json.originalSku) {
                 this.error = json.error;
                 this.uploading = false;
@@ -153,6 +171,9 @@ export default {
 
 <style scoped>
 button {
+  max-width: 150px;
+  justify-content: center;
+  text-align: center;
   margin: 10px 0 10px 10px;
   padding: 5px 16px;
   background: #4CAF50;
@@ -182,7 +203,7 @@ button:disabled {
   background: #f2f5f7;
   padding: 40px;
   border-radius: 20px;
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
   box-shadow: 10px 10px 20px #d1d9e6, -10px -10px 20px #ffffff;
   transition: all 0.3s ease;
@@ -232,7 +253,7 @@ button:disabled {
 
 .progress-container {
   margin-top: 20px;
-  width: 80%;
+  width: 100%;
   height: 20px;
   background: #f2f5f7;
   border-radius: 10px;
@@ -262,9 +283,8 @@ button:disabled {
   margin-top: 30px;
   width: 100%;
   background: #f2f5f7;
-  border-radius: 20px;
-  padding: 20px;
- 
+  /* border-radius: 20px;
+  padding: 20px; */
   overflow-x: auto;
 }
 

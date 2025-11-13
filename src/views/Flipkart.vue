@@ -19,7 +19,7 @@
       <table border="1" cellpadding="6">
         <thead>
           <tr>
-            <th>#</th>
+            <th>S.N.</th>
             <th>SKU Code</th>
             <th>Child SKU</th>
             <th>Old Qty</th>
@@ -202,13 +202,11 @@ button:disabled {
 
 .upload-page {
   display: block;
-  
   align-items: center;
-  
   background: #f2f5f7;
   padding: 40px;
   border-radius: 20px;
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
   box-shadow: 10px 10px 20px #d1d9e6, -10px -10px 20px #ffffff;
   transition: all 0.3s ease;
@@ -258,7 +256,7 @@ button:disabled {
 
 .progress-container {
   margin-top: 20px;
-  width: 80%;
+  width: 100%;
   height: 20px;
   background: #f2f5f7;
   border-radius: 10px;
