@@ -54,6 +54,7 @@ const menuItems = ref([
     // { title: 'Marketplace Orders', route: '/dashboard/marketplace-orders', icon: 'mdi-shopping' },
     // { title: 'Update Orders', route: '/dashboard/update-orders', icon: 'mdi-package-up' },
     { title: 'Update Orders', route: '/dashboard/update-daily-orders', icon: 'mdi-progress-upload' },
+    { title: 'FBA Records', route: '/dashboard/fba-records', icon: 'mdi-progress-upload' },    
     // { title: 'Update Daily Orders', route: '/dashboard/update-daily-orders', icon: 'mdi-package-up' },//Backup   
     // { title: 'SKU Mapping', route: '/dashboard/sku-mapping', icon: 'mdi-package-variant' },
     { title: 'Combo SKU Mapping', route: '/dashboard/combo-sku', icon: 'mdi-vector-combine' }, // H
